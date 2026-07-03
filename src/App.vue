@@ -1,0 +1,1141 @@
+<script setup>
+import { computed, reactive } from "vue";
+
+const screens = [
+  { id: "monitoring", label: "Мониторинг", subtitle: "Очередь тревог и общая картина" },
+  { id: "incident", label: "Инцидент", subtitle: "SOP, видео, карта и журнал" },
+  { id: "events", label: "События", subtitle: "Поиск, фильтры и таймлайн" },
+  { id: "archive", label: "Архив", subtitle: "Завершенные инциденты и отчеты" },
+  { id: "map", label: "Карта", subtitle: "Объекты, этажи, камеры и датчики" },
+  { id: "vms", label: "VMS", subtitle: "Верификация и доказательства" },
+  { id: "supervisor", label: "Supervisor", subtitle: "Нагрузка, SLA и смена" },
+];
+
+const monitorPresets = [
+  { id: "monitoring", label: "Оперативный" },
+  { id: "events", label: "События" },
+  { id: "map", label: "Карта" },
+  { id: "vms", label: "Видео" },
+  { id: "archive", label: "Архив" },
+  { id: "incident", label: "Инцидент" },
+];
+
+const state = reactive({
+  activeScreen: "monitoring",
+  selectedIncident: "INC-2481",
+  sidebarCollapsed: false,
+  incidentSearch: "",
+  incidentSeverity: "all",
+  incidentPreset: "all",
+  eventSearch: "",
+  eventPriority: "all",
+  eventStatus: "all",
+  eventPanels: [
+    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "" },
+  ],
+  nextEventPanelIndex: 2,
+  archiveSearch: "",
+  archiveRange: "week",
+  archiveSeverity: "all",
+  archiveOwner: "all",
+  archiveFrom: "2026-06-27",
+  archiveTo: "2026-07-03",
+  cameraSearch: "",
+  cameraZone: "all",
+  cameraStatus: "all",
+  selectedCameraIds: ["cam-12", "cam-14", "cam-18", "cam-21"],
+  incidentComment: "",
+  sopStepIndex: 2,
+});
+
+const severityOptions = [
+  { id: "all", label: "Все" },
+  { id: "critical", label: "Critical" },
+  { id: "high", label: "High" },
+  { id: "medium", label: "Medium" },
+  { id: "low", label: "Low" },
+];
+
+const incidentPresets = [
+  { id: "all", label: "Все открытые" },
+  { id: "mine", label: "Мои" },
+  { id: "sla", label: "SLA риск" },
+  { id: "handover", label: "На передачу" },
+];
+
+const eventPriorityOptions = ["all", "HIGH", "MED", "LOW"];
+const eventStatusOptions = ["all", "Новое", "Связано", "В работе", "Закрыто", "Ложное"];
+const eventPanelTemplates = [
+  { title: "Все события", system: "all" },
+  { title: "СКУД", system: "СКУД" },
+  { title: "VMS", system: "VMS" },
+  { title: "Датчики", system: "Датчик" },
+];
+const archiveRangeOptions = [
+  { id: "today", label: "Сегодня" },
+  { id: "week", label: "7 дней" },
+  { id: "month", label: "Месяц" },
+  { id: "custom", label: "Период" },
+  { id: "all", label: "Все" },
+];
+
+const sopSteps = [
+  "Принять инцидент оператором",
+  "Проверить видео за 30 секунд до тревоги",
+  "Связаться с постом охраны",
+  "Заблокировать соседние двери",
+  "Добавить комментарий и результат проверки",
+];
+
+const incidents = [
+  {
+    id: "INC-2481",
+    title: "Взлом двери D12",
+    severity: "critical",
+    time: "00:03:42",
+    location: "Здание A / этаж 2 / зона 2B",
+    source: "СКУД + движение + камера 12",
+    owner: "Иванов",
+    status: "В работе",
+    slaRisk: true,
+    handover: false,
+  },
+  {
+    id: "INC-2480",
+    title: "Дым в техпомещении",
+    severity: "high",
+    time: "00:08:11",
+    location: "Здание B / цоколь",
+    source: "Пожарный датчик",
+    owner: "Петрова",
+    status: "Эскалация",
+    slaRisk: true,
+    handover: true,
+  },
+  {
+    id: "INC-2478",
+    title: "Камера offline",
+    severity: "medium",
+    time: "00:21:04",
+    location: "КПП-3 / въезд",
+    source: "VMS health",
+    owner: "Смена 2",
+    status: "Назначено",
+    slaRisk: false,
+    handover: true,
+  },
+  {
+    id: "INC-2476",
+    title: "Доступ запрещен",
+    severity: "medium",
+    time: "00:34:28",
+    location: "Турникет 4 / лобби",
+    source: "СКУД",
+    owner: "Иванов",
+    status: "Проверка",
+    slaRisk: false,
+    handover: false,
+  },
+];
+
+const eventRows = [
+  { time: "12:31:08", priority: "HIGH", type: "Взлом двери", source: "Door D12", status: "Новое", incident: "INC-2481", location: "Здание A / этаж 2", category: "СКУД" },
+  { time: "12:30:55", priority: "MED", type: "Движение в зоне", source: "Motion 2B", status: "Связано", incident: "INC-2481", location: "Здание A / этаж 2", category: "Датчик" },
+  { time: "12:30:44", priority: "HIGH", type: "Видеоаналитика", source: "Camera 12", status: "Связано", incident: "INC-2481", location: "Здание A / этаж 2", category: "VMS" },
+  { time: "12:30:30", priority: "LOW", type: "Потеря сигнала", source: "Camera 18", status: "В работе", incident: "INC-2479", location: "КПП-3", category: "VMS" },
+  { time: "12:28:19", priority: "MED", type: "Доступ запрещен", source: "Turnstile 4", status: "Закрыто", incident: "INC-2476", location: "Лобби", category: "СКУД" },
+  { time: "12:25:02", priority: "LOW", type: "Дверь открыта долго", source: "Door C04", status: "Ложное", incident: "INC-2475", location: "Здание C", category: "СКУД" },
+];
+
+const completedIncidents = [
+  {
+    id: "INC-2475",
+    title: "Дверь открыта долго",
+    severity: "low",
+    openedAt: "2026-07-03 12:10",
+    closedAt: "2026-07-03 12:25",
+    location: "Здание C / коридор",
+    owner: "Иванов",
+    source: "СКУД",
+    status: "Закрыт",
+    closeReason: "Ложная тревога",
+    report: "Готов",
+    duration: "00:15:02",
+  },
+  {
+    id: "INC-2468",
+    title: "Доступ запрещен",
+    severity: "medium",
+    openedAt: "2026-07-02 18:44",
+    closedAt: "2026-07-02 19:18",
+    location: "Лобби / турникет 4",
+    owner: "Петрова",
+    source: "СКУД",
+    status: "Закрыт",
+    closeReason: "Проверено",
+    report: "Черновик",
+    duration: "00:34:12",
+  },
+  {
+    id: "INC-2451",
+    title: "Дым в техпомещении",
+    severity: "high",
+    openedAt: "2026-06-30 04:12",
+    closedAt: "2026-06-30 05:06",
+    location: "Здание B / цоколь",
+    owner: "Смена 2",
+    source: "Пожарный датчик + VMS",
+    status: "Закрыт",
+    closeReason: "Эскалация завершена",
+    report: "Готов",
+    duration: "00:54:01",
+  },
+  {
+    id: "INC-2419",
+    title: "Камера offline",
+    severity: "medium",
+    openedAt: "2026-06-22 09:02",
+    closedAt: "2026-06-22 10:40",
+    location: "КПП-3 / въезд",
+    owner: "Иванов",
+    source: "VMS health",
+    status: "Закрыт",
+    closeReason: "Техническая заявка",
+    report: "Готов",
+    duration: "01:38:33",
+  },
+];
+
+const cameras = [
+  { id: "cam-12", name: "Camera 12", zone: "Здание A / этаж 2", status: "online", tags: "коридор, Door D12" },
+  { id: "cam-14", name: "Camera 14", zone: "Здание A / этаж 2", status: "online", tags: "лестница, зона 2B" },
+  { id: "cam-18", name: "Camera 18", zone: "КПП-3", status: "offline", tags: "въезд, периметр" },
+  { id: "cam-21", name: "Entrance 2", zone: "Здание A / вход", status: "online", tags: "вход, турникеты" },
+  { id: "cam-31", name: "Parking East", zone: "Парковка", status: "online", tags: "парковка, шлагбаум" },
+  { id: "cam-44", name: "Server Room", zone: "Здание A / серверная", status: "restricted", tags: "серверная, доступ" },
+];
+
+const selectedIncident = computed(
+  () =>
+    [...incidents, ...completedIncidents].find((incident) => incident.id === state.selectedIncident) ??
+    incidents[0],
+);
+
+const filteredIncidents = computed(() => {
+  const query = normalize(state.incidentSearch);
+
+  return incidents.filter((incident) => {
+    const matchesQuery =
+      query === "" ||
+      normalize(
+        [
+          incident.id,
+          incident.title,
+          incident.location,
+          incident.source,
+          incident.owner,
+          incident.status,
+        ].join(" "),
+      ).includes(query);
+
+    const matchesSeverity =
+      state.incidentSeverity === "all" || incident.severity === state.incidentSeverity;
+
+    const matchesPreset =
+      state.incidentPreset === "all" ||
+      (state.incidentPreset === "mine" && incident.owner === "Иванов") ||
+      (state.incidentPreset === "sla" && incident.slaRisk) ||
+      (state.incidentPreset === "handover" && incident.handover);
+
+    return matchesQuery && matchesSeverity && matchesPreset;
+  });
+});
+
+const filteredEvents = computed(() => {
+  const query = normalize(state.eventSearch);
+
+  return eventRows.filter((event) => {
+    const matchesQuery =
+      query === "" ||
+      normalize(Object.values(event).join(" ")).includes(query);
+    const matchesPriority = state.eventPriority === "all" || event.priority === state.eventPriority;
+    const matchesStatus = state.eventStatus === "all" || event.status === state.eventStatus;
+
+    return matchesQuery && matchesPriority && matchesStatus;
+  });
+});
+
+const selectedIncidentEvents = computed(() =>
+  eventRows.filter((event) => event.incident === state.selectedIncident),
+);
+
+const eventSystemOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.category))]);
+
+const eventSourceOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.source))]);
+
+const filteredArchive = computed(() => {
+  const query = normalize(state.archiveSearch);
+
+  return completedIncidents.filter((incident) => {
+    const closedDate = incident.closedAt.slice(0, 10);
+    const matchesQuery =
+      query === "" ||
+      normalize(Object.values(incident).join(" ")).includes(query);
+    const matchesSeverity =
+      state.archiveSeverity === "all" || incident.severity === state.archiveSeverity;
+    const matchesOwner = state.archiveOwner === "all" || incident.owner === state.archiveOwner;
+    const matchesRange =
+      state.archiveRange === "all" ||
+      (state.archiveRange === "today" && closedDate === "2026-07-03") ||
+      (state.archiveRange === "week" && closedDate >= "2026-06-27") ||
+      (state.archiveRange === "month" && closedDate >= "2026-07-01") ||
+      (state.archiveRange === "custom" &&
+        closedDate >= state.archiveFrom &&
+        closedDate <= state.archiveTo);
+
+    return matchesQuery && matchesSeverity && matchesOwner && matchesRange;
+  });
+});
+
+const archiveOwners = computed(() => [
+  "all",
+  ...new Set(completedIncidents.map((incident) => incident.owner)),
+]);
+
+const reportSummary = computed(() => {
+  const ready = filteredArchive.value.filter((incident) => incident.report === "Готов").length;
+  const drafts = filteredArchive.value.filter((incident) => incident.report === "Черновик").length;
+
+  return { ready, drafts, total: filteredArchive.value.length };
+});
+
+const cameraZones = computed(() => ["all", ...new Set(cameras.map((camera) => camera.zone))]);
+
+const filteredCameras = computed(() => {
+  const query = normalize(state.cameraSearch);
+
+  return cameras.filter((camera) => {
+    const matchesQuery =
+      query === "" || normalize(Object.values(camera).join(" ")).includes(query);
+    const matchesZone = state.cameraZone === "all" || camera.zone === state.cameraZone;
+    const matchesStatus = state.cameraStatus === "all" || camera.status === state.cameraStatus;
+
+    return matchesQuery && matchesZone && matchesStatus;
+  });
+});
+
+const quadratorSlots = computed(() => {
+  const selected = state.selectedCameraIds
+    .map((cameraId) => cameras.find((camera) => camera.id === cameraId))
+    .filter(Boolean)
+    .slice(0, 4);
+
+  return [...selected, ...Array(4 - selected.length).fill(null)];
+});
+
+function normalize(value) {
+  return String(value).trim().toLowerCase();
+}
+
+function selectIncident(id) {
+  state.selectedIncident = id;
+  state.sopStepIndex = 2;
+  state.incidentComment = "";
+  state.activeScreen = "incident";
+}
+
+function openIncidentFromEvent(event) {
+  selectIncident(event.incident);
+}
+
+function addEventPanel(template = eventPanelTemplates[0]) {
+  if (state.eventPanels.length >= 4) {
+    return;
+  }
+
+  state.eventPanels.push({
+    id: `events-${state.nextEventPanelIndex}`,
+    title: template.title,
+    system: template.system,
+    source: "all",
+    priority: "all",
+    status: "all",
+    query: "",
+  });
+  state.nextEventPanelIndex += 1;
+}
+
+function removeEventPanel(panelId) {
+  if (state.eventPanels.length === 1) {
+    return;
+  }
+
+  const index = state.eventPanels.findIndex((panel) => panel.id === panelId);
+
+  if (index >= 0) {
+    state.eventPanels.splice(index, 1);
+  }
+}
+
+function filteredPanelEvents(panel) {
+  const query = normalize(panel.query);
+
+  return eventRows.filter((event) => {
+    const matchesQuery = query === "" || normalize(Object.values(event).join(" ")).includes(query);
+    const matchesSystem = panel.system === "all" || event.category === panel.system;
+    const matchesSource = panel.source === "all" || event.source === panel.source;
+    const matchesPriority = panel.priority === "all" || event.priority === panel.priority;
+    const matchesStatus = panel.status === "all" || event.status === panel.status;
+
+    return matchesQuery && matchesSystem && matchesSource && matchesPriority && matchesStatus;
+  });
+}
+
+function confirmSopStep() {
+  if (state.sopStepIndex < sopSteps.length) {
+    state.sopStepIndex += 1;
+  }
+}
+
+function finishIncident() {
+  state.incidentComment = "";
+  state.sopStepIndex = sopSteps.length;
+  state.activeScreen = "archive";
+}
+
+function toggleCamera(cameraId) {
+  const index = state.selectedCameraIds.indexOf(cameraId);
+
+  if (index >= 0) {
+    state.selectedCameraIds.splice(index, 1);
+    return;
+  }
+
+  if (state.selectedCameraIds.length >= 4) {
+    state.selectedCameraIds.shift();
+  }
+
+  state.selectedCameraIds.push(cameraId);
+}
+</script>
+
+<template>
+  <main class="app-shell" :class="{ 'sidebar-collapsed': state.sidebarCollapsed }">
+    <aside class="sidebar" aria-label="Навигация по макетам">
+      <div class="brand-block">
+        <div class="brand-mark">PS</div>
+        <div class="brand-copy">
+          <p class="eyebrow">PSIM prototype</p>
+          <h1>Операторский контур</h1>
+        </div>
+      </div>
+
+      <nav class="screen-nav">
+        <button
+          v-for="screen in screens"
+          :key="screen.id"
+          class="nav-item"
+          :class="{ 'nav-item-active': state.activeScreen === screen.id }"
+          type="button"
+          @click="state.activeScreen = screen.id"
+          :title="screen.label"
+        >
+          <b>{{ screen.label.slice(0, 2) }}</b>
+          <span>{{ screen.label }}</span>
+          <small>{{ screen.subtitle }}</small>
+        </button>
+      </nav>
+
+      <section class="shift-card">
+        <p class="eyebrow">Смена</p>
+        <div class="shift-row">
+          <strong>12 открытых</strong>
+          <span>3 критичных</span>
+        </div>
+        <div class="load-line" aria-hidden="true">
+          <span style="width: 72%"></span>
+        </div>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div class="topbar-title">
+          <button
+            class="icon-button"
+            type="button"
+            :aria-label="state.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
+            :title="state.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
+            @click="state.sidebarCollapsed = !state.sidebarCollapsed"
+          >
+            {{ state.sidebarCollapsed ? "☰" : "←" }}
+          </button>
+          <div>
+            <p class="eyebrow">Command center / Северный кампус</p>
+            <h2>{{ screens.find((screen) => screen.id === state.activeScreen)?.label }}</h2>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="monitor-switcher" aria-label="Режим отдельного монитора">
+            <button
+              v-for="preset in monitorPresets"
+              :key="preset.id"
+              type="button"
+              :class="{ active: state.activeScreen === preset.id }"
+              @click="state.activeScreen = preset.id"
+            >
+              {{ preset.label }}
+            </button>
+          </div>
+          <button class="ghost-button" type="button">Передать смену</button>
+          <button class="primary-button" type="button">Создать инцидент</button>
+        </div>
+      </header>
+
+      <section v-if="state.activeScreen === 'monitoring'" class="screen monitoring-screen">
+        <div class="main-grid">
+          <section class="panel incident-queue">
+            <div class="panel-header">
+              <h3>Очередь тревог</h3>
+              <span>{{ filteredIncidents.length }} / {{ incidents.length }}</span>
+            </div>
+
+            <div class="search-block">
+              <label class="search-field">
+                <span>Поиск</span>
+                <input v-model="state.incidentSearch" type="search" placeholder="ID, зона, дверь, камера, оператор" />
+              </label>
+              <div class="segmented-control" aria-label="Быстрые представления инцидентов">
+                <button
+                  v-for="preset in incidentPresets"
+                  :key="preset.id"
+                  type="button"
+                  :class="{ active: state.incidentPreset === preset.id }"
+                  @click="state.incidentPreset = preset.id"
+                >
+                  {{ preset.label }}
+                </button>
+              </div>
+              <div class="chip-row" aria-label="Фильтр критичности">
+                <button
+                  v-for="option in severityOptions"
+                  :key="option.id"
+                  type="button"
+                  :class="{ active: state.incidentSeverity === option.id }"
+                  @click="state.incidentSeverity = option.id"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+
+            <button
+              v-for="incident in filteredIncidents"
+              :key="incident.id"
+              class="incident-card"
+              :class="`severity-${incident.severity}`"
+              type="button"
+              @click="selectIncident(incident.id)"
+            >
+              <span class="severity-dot"></span>
+              <span>
+                <strong>{{ incident.title }}</strong>
+                <small>{{ incident.location }}</small>
+                <small>{{ incident.id }} · {{ incident.owner }} · {{ incident.status }}</small>
+              </span>
+              <em>{{ incident.time }}</em>
+            </button>
+            <div v-if="filteredIncidents.length === 0" class="empty-state">
+              Нет инцидентов под выбранные фильтры
+            </div>
+          </section>
+
+          <section class="panel map-panel">
+            <div class="panel-header">
+              <h3>Оперативная карта</h3>
+              <span>Здание A / этаж 2</span>
+            </div>
+            <div class="map-canvas compact-map">
+              <div class="room room-a">Склад</div>
+              <div class="room room-b">Коридор</div>
+              <div class="room room-c">Пост</div>
+              <button class="map-marker marker-critical" type="button" @click="selectIncident('INC-2481')">
+                D12
+              </button>
+              <span class="camera camera-one">Cam 12</span>
+              <span class="camera camera-two">Cam 14</span>
+              <span class="fov fov-one"></span>
+              <span class="route-line"></span>
+            </div>
+          </section>
+
+          <section class="panel video-stack">
+            <div class="panel-header">
+              <h3>Быстрая верификация</h3>
+              <span>4 камеры</span>
+            </div>
+            <div class="video-tile large-video">Camera 12</div>
+            <div class="video-grid">
+              <div class="video-tile">Cam 14</div>
+              <div class="video-tile warning-video">Cam 18 offline</div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section v-else-if="state.activeScreen === 'incident'" class="screen incident-screen">
+        <div class="incident-hero">
+          <div>
+            <p class="eyebrow">{{ selectedIncident.id }} / {{ selectedIncident.source }}</p>
+            <h3>{{ selectedIncident.title }}</h3>
+            <p>{{ selectedIncident.location }}</p>
+          </div>
+          <div class="incident-actions">
+            <span class="timer">{{ selectedIncident.time }}</span>
+            <button class="ghost-button" type="button">Назначить</button>
+            <button class="danger-button" type="button">Эскалировать</button>
+          </div>
+        </div>
+
+        <div class="incident-layout">
+          <section class="panel sop-panel">
+            <div class="panel-header">
+              <h3>SOP</h3>
+              <span>{{ selectedIncident.status }}</span>
+            </div>
+            <ol class="sop-list">
+              <li
+                v-for="(step, index) in sopSteps"
+                :key="step"
+                :class="{ done: index < state.sopStepIndex, active: index === state.sopStepIndex }"
+              >
+                {{ step }}
+              </li>
+            </ol>
+            <div class="sop-actions">
+              <button
+                class="primary-button"
+                type="button"
+                :disabled="state.sopStepIndex >= sopSteps.length"
+                @click="confirmSopStep"
+              >
+                Подтвердить шаг
+              </button>
+              <button class="danger-button" type="button" @click="finishIncident">
+                Завершить инцидент
+              </button>
+            </div>
+          </section>
+
+          <section class="panel map-panel">
+            <div class="panel-header">
+              <h3>Контекст места</h3>
+              <span>2 камеры рядом</span>
+            </div>
+            <div class="map-canvas incident-map">
+              <div class="room room-a">Зона 2B</div>
+              <div class="room room-b">Лестница</div>
+              <button class="map-marker marker-critical">Door D12</button>
+              <span class="camera camera-one">Cam 12</span>
+              <span class="fov fov-one"></span>
+            </div>
+          </section>
+
+          <section class="panel video-stack">
+            <div class="panel-header">
+              <h3>Видео</h3>
+              <span>pre/post alarm</span>
+            </div>
+            <div class="video-tile large-video">Camera 12 / -00:30</div>
+            <div class="timeline">
+              <span></span>
+              <strong></strong>
+            </div>
+          </section>
+
+          <section class="panel linked-events-panel">
+            <div class="panel-header">
+              <h3>Связанные события</h3>
+              <span>{{ selectedIncidentEvents.length }} событий</span>
+            </div>
+            <div class="linked-event-list">
+              <button
+                v-for="event in selectedIncidentEvents"
+                :key="`${event.time}-${event.source}`"
+                class="linked-event"
+                type="button"
+                @click="state.activeScreen = 'events'"
+              >
+                <span>{{ event.time }}</span>
+                <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
+                <strong>{{ event.type }}</strong>
+                <small>{{ event.category }} · {{ event.source }}</small>
+              </button>
+              <div v-if="selectedIncidentEvents.length === 0" class="empty-state">
+                Связанных событий пока нет
+              </div>
+            </div>
+          </section>
+
+          <section class="panel journal-panel">
+            <div class="panel-header">
+              <h3>Журнал</h3>
+              <span>audit trail</span>
+            </div>
+            <div class="comment-box">
+              <label class="search-field">
+                <span>Комментарий оператора</span>
+                <textarea
+                  v-model="state.incidentComment"
+                  placeholder="Опишите результат проверки, контакт с постом, причину закрытия или эскалации"
+                ></textarea>
+              </label>
+              <div class="comment-actions">
+                <button class="ghost-button" type="button" :disabled="state.incidentComment.trim() === ''">
+                  Добавить комментарий
+                </button>
+                <button class="primary-button" type="button" :disabled="state.incidentComment.trim() === ''">
+                  Добавить в отчет
+                </button>
+              </div>
+            </div>
+            <ul class="activity-list">
+              <li><strong>12:31</strong> Инцидент принят оператором Иванов</li>
+              <li><strong>12:32</strong> Открыта Camera 12</li>
+              <li><strong>12:33</strong> SOP шаг 2 отмечен выполненным</li>
+              <li v-if="state.incidentComment.trim() !== ''">
+                <strong>Сейчас</strong> {{ state.incidentComment }}
+              </li>
+            </ul>
+          </section>
+        </div>
+      </section>
+
+      <section v-else-if="state.activeScreen === 'events'" class="screen events-screen">
+        <section class="panel event-workbench-panel">
+          <div class="panel-header">
+            <h3>Рабочие таблицы событий</h3>
+            <div class="filter-pills">
+              <span>{{ state.eventPanels.length }} таблиц</span>
+              <span>до 4 одновременно</span>
+              <span>фильтры независимы</span>
+              <span>переход к инциденту</span>
+            </div>
+          </div>
+
+          <div class="event-workbench-actions">
+            <span>Открыть таблицу:</span>
+            <button
+              v-for="template in eventPanelTemplates"
+              :key="template.title"
+              class="ghost-button"
+              type="button"
+              :disabled="state.eventPanels.length >= 4"
+              @click="addEventPanel(template)"
+            >
+              + {{ template.title }}
+            </button>
+          </div>
+
+          <div
+            class="event-panel-grid"
+            :class="{ 'single-event-panel-grid': state.eventPanels.length === 1 }"
+          >
+            <section v-for="panel in state.eventPanels" :key="panel.id" class="event-panel">
+              <div class="event-panel-title">
+                <div>
+                  <h4>{{ panel.title }}</h4>
+                  <span>{{ filteredPanelEvents(panel).length }} событий</span>
+                </div>
+                <div class="event-panel-actions">
+                  <button class="ghost-button compact-button" type="button" @click="panel.query = ''; panel.source = 'all'">
+                    Сброс
+                  </button>
+                  <button
+                    class="ghost-button compact-button"
+                    type="button"
+                    :disabled="state.eventPanels.length === 1"
+                    @click="removeEventPanel(panel.id)"
+                  >
+                    Закрыть
+                  </button>
+                </div>
+              </div>
+
+              <div class="event-panel-filters">
+                <label class="search-field">
+                  <span>Поиск</span>
+                  <input v-model="panel.query" type="search" placeholder="INC, источник, зона" />
+                </label>
+                <label class="select-field">
+                  <span>Система</span>
+                  <select v-model="panel.system">
+                    <option v-for="system in eventSystemOptions" :key="system" :value="system">
+                      {{ system === "all" ? "Все" : system }}
+                    </option>
+                  </select>
+                </label>
+                <label class="select-field">
+                  <span>Источник</span>
+                  <select v-model="panel.source">
+                    <option v-for="source in eventSourceOptions" :key="source" :value="source">
+                      {{ source === "all" ? "Все" : source }}
+                    </option>
+                  </select>
+                </label>
+                <label class="select-field">
+                  <span>Уровень</span>
+                  <select v-model="panel.priority">
+                    <option v-for="priority in eventPriorityOptions" :key="priority" :value="priority">
+                      {{ priority === "all" ? "Все" : priority }}
+                    </option>
+                  </select>
+                </label>
+                <label class="select-field">
+                  <span>Статус</span>
+                  <select v-model="panel.status">
+                    <option v-for="status in eventStatusOptions" :key="status" :value="status">
+                      {{ status === "all" ? "Все" : status }}
+                    </option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="mini-event-table">
+                <button
+                  v-for="event in filteredPanelEvents(panel)"
+                  :key="`${panel.id}-${event.time}-${event.source}`"
+                  class="mini-event-row"
+                  type="button"
+                  @click="openIncidentFromEvent(event)"
+                >
+                  <span class="event-time">{{ event.time }}</span>
+                  <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
+                  <span>
+                    <strong>{{ event.type }}</strong>
+                    <small>{{ event.category }} · {{ event.source }} · {{ event.location }}</small>
+                  </span>
+                  <em>{{ event.incident }}</em>
+                </button>
+                <div v-if="filteredPanelEvents(panel).length === 0" class="empty-state">
+                  Нет событий
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="panel incident-link-panel">
+          <div class="panel-header">
+            <h3>Связи событий и инцидентов</h3>
+            <span>выбран: {{ selectedIncident.id }}</span>
+          </div>
+          <div class="relation-strip">
+            <button
+              v-for="event in selectedIncidentEvents"
+              :key="`relation-${event.time}-${event.source}`"
+              type="button"
+              @click="openIncidentFromEvent(event)"
+            >
+              <span>{{ event.time }}</span>
+              <strong>{{ event.type }}</strong>
+              <small>{{ event.source }} → {{ event.incident }}</small>
+            </button>
+            <div v-if="selectedIncidentEvents.length === 0" class="empty-state">
+              Выберите событие, чтобы перейти к связанному инциденту
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section v-else-if="state.activeScreen === 'archive'" class="screen archive-screen">
+        <section class="panel archive-filter-panel">
+          <div class="panel-header">
+            <h3>Завершенные инциденты</h3>
+            <div class="filter-pills">
+              <span>{{ reportSummary.total }} найдено</span>
+              <span>{{ reportSummary.ready }} отчетов готово</span>
+              <span>{{ reportSummary.drafts }} черновиков</span>
+            </div>
+          </div>
+
+          <div class="archive-filter-bar">
+            <label class="search-field archive-search">
+              <span>Поиск по архиву</span>
+              <input v-model="state.archiveSearch" type="search" placeholder="ID, объект, причина, оператор" />
+            </label>
+            <label class="select-field">
+              <span>Период</span>
+              <select v-model="state.archiveRange">
+                <option v-for="range in archiveRangeOptions" :key="range.id" :value="range.id">
+                  {{ range.label }}
+                </option>
+              </select>
+            </label>
+            <label class="select-field">
+              <span>Критичность</span>
+              <select v-model="state.archiveSeverity">
+                <option v-for="option in severityOptions" :key="option.id" :value="option.id">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+            <label class="select-field">
+              <span>Оператор</span>
+              <select v-model="state.archiveOwner">
+                <option v-for="owner in archiveOwners" :key="owner" :value="owner">
+                  {{ owner === "all" ? "Все" : owner }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div v-if="state.archiveRange === 'custom'" class="date-range">
+            <label class="search-field">
+              <span>С</span>
+              <input v-model="state.archiveFrom" type="date" />
+            </label>
+            <label class="search-field">
+              <span>По</span>
+              <input v-model="state.archiveTo" type="date" />
+            </label>
+          </div>
+
+          <div class="saved-views archive-actions">
+            <button type="button" @click="state.archiveRange = 'today'; state.archiveSearch = ''">
+              Закрыто сегодня
+            </button>
+            <button type="button" @click="state.archiveSearch = 'Ложная тревога'; state.archiveRange = 'all'">
+              Ложные тревоги
+            </button>
+            <button type="button" @click="state.archiveSeverity = 'high'; state.archiveRange = 'all'">
+              High для отчета
+            </button>
+            <button type="button">Сформировать отчет</button>
+          </div>
+        </section>
+
+        <section class="panel archive-table-panel">
+          <div class="archive-row archive-head">
+            <span>Инцидент</span>
+            <span>Закрыт</span>
+            <span>Длительность</span>
+            <span>Оператор</span>
+            <span>Причина</span>
+            <span>Отчет</span>
+          </div>
+          <button
+            v-for="incident in filteredArchive"
+            :key="incident.id"
+            class="archive-row"
+            type="button"
+            @click="selectIncident(incident.id)"
+          >
+            <span>
+              <strong>{{ incident.id }} · {{ incident.title }}</strong>
+              <small>{{ incident.location }}</small>
+            </span>
+            <span>{{ incident.closedAt }}</span>
+            <span>{{ incident.duration }}</span>
+            <span>{{ incident.owner }}</span>
+            <span>{{ incident.closeReason }}</span>
+            <span>
+              <mark :class="incident.report === 'Готов' ? 'report-ready' : 'report-draft'">
+                {{ incident.report }}
+              </mark>
+            </span>
+          </button>
+          <div v-if="filteredArchive.length === 0" class="empty-state">
+            В архиве нет инцидентов под выбранные фильтры
+          </div>
+        </section>
+      </section>
+
+      <section v-else-if="state.activeScreen === 'map'" class="screen map-screen">
+        <section class="panel layer-panel">
+          <div class="panel-header">
+            <h3>Слои</h3>
+            <span>этаж 2</span>
+          </div>
+          <label><input type="checkbox" checked /> Инциденты</label>
+          <label><input type="checkbox" checked /> Камеры и FOV</label>
+          <label><input type="checkbox" checked /> Двери и СКУД</label>
+          <label><input type="checkbox" checked /> Датчики</label>
+          <label><input type="checkbox" /> Патрули</label>
+        </section>
+        <section class="panel full-map-panel">
+          <div class="panel-header">
+            <h3>Здание A</h3>
+            <div class="filter-pills">
+              <span>Кампус</span>
+              <span>Здание A</span>
+              <span>Этаж 2</span>
+            </div>
+          </div>
+          <div class="map-canvas full-map">
+            <div class="room room-a">Зона 2A</div>
+            <div class="room room-b">Зона 2B</div>
+            <div class="room room-c">Пост охраны</div>
+            <div class="room room-d">Серверная</div>
+            <button class="map-marker marker-critical">D12</button>
+            <button class="map-marker marker-high">Smoke</button>
+            <span class="camera camera-one">Cam 12</span>
+            <span class="camera camera-two">Cam 14</span>
+            <span class="camera camera-three">Cam 18</span>
+            <span class="fov fov-one"></span>
+            <span class="fov fov-two"></span>
+          </div>
+        </section>
+        <section class="panel object-panel">
+          <div class="panel-header">
+            <h3>Door D12</h3>
+            <span>Alarm</span>
+          </div>
+          <p>Ближайшие камеры: Camera 12, Camera 14</p>
+          <div class="object-actions">
+            <button class="ghost-button" type="button">Видео</button>
+            <button class="ghost-button" type="button">История</button>
+            <button class="primary-button" type="button">Открыть SOP</button>
+          </div>
+        </section>
+      </section>
+
+      <section v-else-if="state.activeScreen === 'vms'" class="screen vms-screen">
+        <section class="panel camera-catalog">
+          <div class="panel-header">
+            <h3>Камеры</h3>
+            <span>{{ filteredCameras.length }} / {{ cameras.length }}</span>
+          </div>
+
+          <div class="camera-filters">
+            <label class="search-field">
+              <span>Поиск камеры</span>
+              <input v-model="state.cameraSearch" type="search" placeholder="Cam 12, вход, КПП, зона" />
+            </label>
+            <label class="select-field">
+              <span>Зона</span>
+              <select v-model="state.cameraZone">
+                <option v-for="zone in cameraZones" :key="zone" :value="zone">
+                  {{ zone === "all" ? "Все зоны" : zone }}
+                </option>
+              </select>
+            </label>
+            <label class="select-field">
+              <span>Статус</span>
+              <select v-model="state.cameraStatus">
+                <option value="all">Все</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+                <option value="restricted">Restricted</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="camera-list">
+            <button
+              v-for="cameraItem in filteredCameras"
+              :key="cameraItem.id"
+              class="camera-row"
+              :class="{
+                selected: state.selectedCameraIds.includes(cameraItem.id),
+                offline: cameraItem.status === 'offline',
+              }"
+              type="button"
+              @click="toggleCamera(cameraItem.id)"
+            >
+              <span class="camera-status-dot"></span>
+              <span>
+                <strong>{{ cameraItem.name }}</strong>
+                <small>{{ cameraItem.zone }} · {{ cameraItem.tags }}</small>
+              </span>
+              <em>{{ cameraItem.status }}</em>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel vms-main">
+          <div class="panel-header">
+            <h3>Квадратор</h3>
+            <div class="filter-pills">
+              <span>{{ state.selectedCameraIds.length }} камеры</span>
+              <span>Live</span>
+              <span>Архив</span>
+            </div>
+          </div>
+
+          <div class="quad-grid">
+            <div
+              v-for="(cameraItem, index) in quadratorSlots"
+              :key="cameraItem?.id ?? `empty-${index}`"
+              class="video-tile quad-tile"
+              :class="{ 'warning-video': cameraItem?.status === 'offline', 'empty-video': !cameraItem }"
+            >
+              <template v-if="cameraItem">
+                <strong>{{ cameraItem.name }}</strong>
+                <small>{{ cameraItem.zone }}</small>
+              </template>
+              <template v-else>
+                Выберите камеру
+              </template>
+            </div>
+          </div>
+
+          <div class="vms-controls">
+            <button class="ghost-button" type="button">Сетка 2x2</button>
+            <button class="ghost-button" type="button">Сетка 3x3</button>
+            <button class="ghost-button" type="button">Bookmark</button>
+            <button class="ghost-button" type="button">Snapshot</button>
+            <button class="ghost-button" type="button">Evidence lock</button>
+            <button class="primary-button" type="button">Экспорт фрагмента</button>
+          </div>
+
+          <div class="wide-timeline vms-timeline">
+            <span class="timeline-event event-two">Alarm</span>
+          </div>
+        </section>
+      </section>
+
+      <section v-else class="screen supervisor-screen">
+        <div class="kpi-grid">
+          <section class="panel kpi-card">
+            <span>MTTA</span>
+            <strong>00:41</strong>
+            <small>лучше нормы на 18%</small>
+          </section>
+          <section class="panel kpi-card">
+            <span>Открыто</span>
+            <strong>12</strong>
+            <small>3 критичных</small>
+          </section>
+          <section class="panel kpi-card">
+            <span>Ложные</span>
+            <strong>22%</strong>
+            <small>за последние 24 часа</small>
+          </section>
+        </div>
+
+        <section class="panel supervisor-board">
+          <div class="panel-header">
+            <h3>Нагрузка операторов</h3>
+            <span>SLA и handover</span>
+          </div>
+          <div class="operator-row">
+            <span>Иванов</span>
+            <div class="load-line"><span style="width: 82%"></span></div>
+            <strong>5</strong>
+          </div>
+          <div class="operator-row">
+            <span>Петрова</span>
+            <div class="load-line"><span style="width: 54%"></span></div>
+            <strong>3</strong>
+          </div>
+          <div class="operator-row">
+            <span>Смена 2</span>
+            <div class="load-line"><span style="width: 37%"></span></div>
+            <strong>2</strong>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+</template>
