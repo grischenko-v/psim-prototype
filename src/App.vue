@@ -2,22 +2,48 @@
 import { computed, reactive } from "vue";
 
 const screens = [
-  { id: "monitoring", label: "Мониторинг", subtitle: "Очередь тревог и общая картина" },
-  { id: "incident", label: "Инцидент", subtitle: "SOP, видео, карта и журнал" },
-  { id: "events", label: "События", subtitle: "Поиск, фильтры и таймлайн" },
-  { id: "archive", label: "Архив", subtitle: "Завершенные инциденты и отчеты" },
-  { id: "map", label: "Карта", subtitle: "Объекты, этажи, камеры и датчики" },
-  { id: "vms", label: "VMS", subtitle: "Верификация и доказательства" },
-  { id: "supervisor", label: "Supervisor", subtitle: "Нагрузка, SLA и смена" },
-];
-
-const monitorPresets = [
-  { id: "monitoring", label: "Оперативный" },
-  { id: "events", label: "События" },
-  { id: "map", label: "Карта" },
-  { id: "vms", label: "Видео" },
-  { id: "archive", label: "Архив" },
-  { id: "incident", label: "Инцидент" },
+  {
+    id: "monitoring",
+    label: "Мониторинг",
+    subtitle: "Очередь тревог и общая картина",
+    icon: ["M22 12h-4l-3 8-6-16-3 8H2"],
+  },
+  {
+    id: "incident",
+    label: "Инцидент",
+    subtitle: "SOP, видео, карта и журнал",
+    icon: ["M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z", "M12 9v4", "M12 17h.01"],
+  },
+  {
+    id: "events",
+    label: "События",
+    subtitle: "Поиск, фильтры и таймлайн",
+    icon: ["M4 6h16", "M7 12h10", "M10 18h4"],
+  },
+  {
+    id: "archive",
+    label: "Архив",
+    subtitle: "Завершенные инциденты и отчеты",
+    icon: ["M3 8h18v13H3z", "M1 3h22v5H1z", "M10 13h4"],
+  },
+  {
+    id: "map",
+    label: "Карта",
+    subtitle: "Объекты, этажи, камеры и датчики",
+    icon: ["M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z", "M9 3v15", "M15 6v15"],
+  },
+  {
+    id: "vms",
+    label: "Видео",
+    subtitle: "Верификация и доказательства",
+    icon: ["M1 5h15v14H1z", "M23 7l-7 5 7 5z"],
+  },
+  {
+    id: "supervisor",
+    label: "Supervisor",
+    subtitle: "Нагрузка, SLA и смена",
+    icon: ["M3 21h18", "M7 17v-6", "M12 17V7", "M17 17v-9"],
+  },
 ];
 
 const state = reactive({
@@ -440,7 +466,9 @@ function toggleCamera(cameraId) {
           @click="state.activeScreen = screen.id"
           :title="screen.label"
         >
-          <b>{{ screen.label.slice(0, 2) }}</b>
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path v-for="path in screen.icon" :key="path" :d="path"></path>
+          </svg>
           <span>{{ screen.label }}</span>
           <small>{{ screen.subtitle }}</small>
         </button>
@@ -476,19 +504,8 @@ function toggleCamera(cameraId) {
           </div>
         </div>
         <div class="topbar-actions">
-          <div class="monitor-switcher" aria-label="Режим отдельного монитора">
-            <button
-              v-for="preset in monitorPresets"
-              :key="preset.id"
-              type="button"
-              :class="{ active: state.activeScreen === preset.id }"
-              @click="state.activeScreen = preset.id"
-            >
-              {{ preset.label }}
-            </button>
-          </div>
           <button class="ghost-button" type="button">Передать смену</button>
-          <button class="primary-button" type="button">Создать инцидент</button>
+          <button class="primary-button" type="button">Создать событие</button>
         </div>
       </header>
 
