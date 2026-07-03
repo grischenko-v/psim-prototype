@@ -70,6 +70,9 @@ const state = reactive({
   cameraZone: "all",
   cameraStatus: "all",
   selectedCameraIds: ["cam-12", "cam-14", "cam-18", "cam-21"],
+  quadSlotCount: 4,
+  vmsFullscreen: false,
+  focusedCameraId: "cam-12",
   incidentComment: "",
   sopStepIndex: 2,
 });
@@ -232,13 +235,28 @@ const completedIncidents = [
   },
 ];
 
-const cameras = [
+const baseCameras = [
   { id: "cam-12", name: "Camera 12", zone: "Здание A / этаж 2", status: "online", tags: "коридор, Door D12" },
   { id: "cam-14", name: "Camera 14", zone: "Здание A / этаж 2", status: "online", tags: "лестница, зона 2B" },
   { id: "cam-18", name: "Camera 18", zone: "КПП-3", status: "offline", tags: "въезд, периметр" },
   { id: "cam-21", name: "Entrance 2", zone: "Здание A / вход", status: "online", tags: "вход, турникеты" },
   { id: "cam-31", name: "Parking East", zone: "Парковка", status: "online", tags: "парковка, шлагбаум" },
   { id: "cam-44", name: "Server Room", zone: "Здание A / серверная", status: "restricted", tags: "серверная, доступ" },
+];
+
+const cameras = [
+  ...baseCameras,
+  ...Array.from({ length: 26 }, (_, index) => {
+    const number = index + 45;
+    const zones = ["Здание A / этаж 1", "Здание B / склад", "Периметр", "Парковка", "КПП-1"];
+    return {
+      id: `cam-${number}`,
+      name: `Camera ${number}`,
+      zone: zones[index % zones.length],
+      status: index % 11 === 0 ? "offline" : "online",
+      tags: index % 2 === 0 ? "обзор, маршрут" : "периметр, доступ",
+    };
+  }),
 ];
 
 const selectedIncident = computed(
@@ -354,9 +372,16 @@ const quadratorSlots = computed(() => {
   const selected = state.selectedCameraIds
     .map((cameraId) => cameras.find((camera) => camera.id === cameraId))
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, state.quadSlotCount);
 
-  return [...selected, ...Array(4 - selected.length).fill(null)];
+  return [...selected, ...Array(state.quadSlotCount - selected.length).fill(null)];
+});
+
+const quadColumnCount = computed(() => {
+  if (state.quadSlotCount <= 4) return 2;
+  if (state.quadSlotCount <= 9) return 3;
+  if (state.quadSlotCount <= 16) return 4;
+  return 8;
 });
 
 function normalize(value) {
@@ -437,16 +462,38 @@ function toggleCamera(cameraId) {
     return;
   }
 
-  if (state.selectedCameraIds.length >= 4) {
+  if (state.selectedCameraIds.length >= state.quadSlotCount) {
     state.selectedCameraIds.shift();
   }
 
   state.selectedCameraIds.push(cameraId);
+  state.focusedCameraId = cameraId;
+}
+
+function setQuadSlotCount(count) {
+  state.quadSlotCount = count;
+  state.selectedCameraIds.splice(count);
+}
+
+function openCameraFromMap(cameraId) {
+  if (!state.selectedCameraIds.includes(cameraId)) {
+    if (state.selectedCameraIds.length >= state.quadSlotCount) {
+      state.selectedCameraIds.shift();
+    }
+    state.selectedCameraIds.push(cameraId);
+  }
+  state.focusedCameraId = cameraId;
+  state.activeScreen = "vms";
+}
+
+function openMapFromCamera(cameraId) {
+  state.focusedCameraId = cameraId;
+  state.activeScreen = "map";
 }
 </script>
 
 <template>
-  <main class="app-shell" :class="{ 'sidebar-collapsed': state.sidebarCollapsed }">
+  <main class="app-shell" :class="{ 'sidebar-collapsed': state.sidebarCollapsed, 'vms-fullscreen': state.vmsFullscreen }">
     <aside class="sidebar" aria-label="Навигация по макетам">
       <div class="brand-block">
         <div class="brand-mark">PS</div>
@@ -579,8 +626,8 @@ function toggleCamera(cameraId) {
               <button class="map-marker marker-critical" type="button" @click="selectIncident('INC-2481')">
                 D12
               </button>
-              <span class="camera camera-one">Cam 12</span>
-              <span class="camera camera-two">Cam 14</span>
+              <button class="camera camera-one" :class="{ 'camera-focused': state.focusedCameraId === 'cam-12' }" type="button" @click="openCameraFromMap('cam-12')">Cam 12</button>
+              <button class="camera camera-two" :class="{ 'camera-focused': state.focusedCameraId === 'cam-14' }" type="button" @click="openCameraFromMap('cam-14')">Cam 14</button>
               <span class="fov fov-one"></span>
               <span class="route-line"></span>
             </div>
@@ -653,7 +700,7 @@ function toggleCamera(cameraId) {
               <div class="room room-a">Зона 2B</div>
               <div class="room room-b">Лестница</div>
               <button class="map-marker marker-critical">Door D12</button>
-              <span class="camera camera-one">Cam 12</span>
+              <button class="camera camera-one" :class="{ 'camera-focused': state.focusedCameraId === 'cam-12' }" type="button" @click="openCameraFromMap('cam-12')">Cam 12</button>
               <span class="fov fov-one"></span>
             </div>
           </section>
@@ -996,9 +1043,9 @@ function toggleCamera(cameraId) {
             <div class="room room-d">Серверная</div>
             <button class="map-marker marker-critical">D12</button>
             <button class="map-marker marker-high">Smoke</button>
-            <span class="camera camera-one">Cam 12</span>
-            <span class="camera camera-two">Cam 14</span>
-            <span class="camera camera-three">Cam 18</span>
+            <button class="camera camera-one" :class="{ 'camera-focused': state.focusedCameraId === 'cam-12' }" type="button" @click="openCameraFromMap('cam-12')">Cam 12</button>
+            <button class="camera camera-two" :class="{ 'camera-focused': state.focusedCameraId === 'cam-14' }" type="button" @click="openCameraFromMap('cam-14')">Cam 14</button>
+            <button class="camera camera-three" :class="{ 'camera-focused': state.focusedCameraId === 'cam-18' }" type="button" @click="openCameraFromMap('cam-18')">Cam 18</button>
             <span class="fov fov-one"></span>
             <span class="fov fov-two"></span>
           </div>
@@ -1010,7 +1057,7 @@ function toggleCamera(cameraId) {
           </div>
           <p>Ближайшие камеры: Camera 12, Camera 14</p>
           <div class="object-actions">
-            <button class="ghost-button" type="button">Видео</button>
+            <button class="ghost-button" type="button" @click="openCameraFromMap('cam-12')">Видео</button>
             <button class="ghost-button" type="button">История</button>
             <button class="primary-button" type="button">Открыть SOP</button>
           </div>
@@ -1049,7 +1096,7 @@ function toggleCamera(cameraId) {
           </div>
 
           <div class="camera-list">
-            <button
+            <div
               v-for="cameraItem in filteredCameras"
               :key="cameraItem.id"
               class="camera-row"
@@ -1057,7 +1104,8 @@ function toggleCamera(cameraId) {
                 selected: state.selectedCameraIds.includes(cameraItem.id),
                 offline: cameraItem.status === 'offline',
               }"
-              type="button"
+              role="button"
+              tabindex="0"
               @click="toggleCamera(cameraItem.id)"
             >
               <span class="camera-status-dot"></span>
@@ -1066,7 +1114,10 @@ function toggleCamera(cameraId) {
                 <small>{{ cameraItem.zone }} · {{ cameraItem.tags }}</small>
               </span>
               <em>{{ cameraItem.status }}</em>
-            </button>
+              <button class="map-link-button" type="button" @click.stop="openMapFromCamera(cameraItem.id)">
+                Карта
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1074,13 +1125,13 @@ function toggleCamera(cameraId) {
           <div class="panel-header">
             <h3>Квадратор</h3>
             <div class="filter-pills">
-              <span>{{ state.selectedCameraIds.length }} камеры</span>
+              <span>{{ state.selectedCameraIds.length }} / {{ state.quadSlotCount }}</span>
               <span>Live</span>
               <span>Архив</span>
             </div>
           </div>
 
-          <div class="quad-grid">
+          <div class="quad-grid" :style="{ '--quad-columns': quadColumnCount }">
             <div
               v-for="(cameraItem, index) in quadratorSlots"
               :key="cameraItem?.id ?? `empty-${index}`"
@@ -1090,6 +1141,9 @@ function toggleCamera(cameraId) {
               <template v-if="cameraItem">
                 <strong>{{ cameraItem.name }}</strong>
                 <small>{{ cameraItem.zone }}</small>
+                <button class="video-map-button" type="button" @click="openMapFromCamera(cameraItem.id)">
+                  На карте
+                </button>
               </template>
               <template v-else>
                 Выберите камеру
@@ -1098,8 +1152,13 @@ function toggleCamera(cameraId) {
           </div>
 
           <div class="vms-controls">
-            <button class="ghost-button" type="button">Сетка 2x2</button>
-            <button class="ghost-button" type="button">Сетка 3x3</button>
+            <button class="ghost-button" type="button" @click="setQuadSlotCount(4)">2x2</button>
+            <button class="ghost-button" type="button" @click="setQuadSlotCount(9)">3x3</button>
+            <button class="ghost-button" type="button" @click="setQuadSlotCount(16)">4x4</button>
+            <button class="ghost-button" type="button" @click="setQuadSlotCount(32)">32 камеры</button>
+            <button class="ghost-button" type="button" @click="state.vmsFullscreen = !state.vmsFullscreen">
+              {{ state.vmsFullscreen ? "Обычный режим" : "На всю страницу" }}
+            </button>
             <button class="ghost-button" type="button">Bookmark</button>
             <button class="ghost-button" type="button">Snapshot</button>
             <button class="ghost-button" type="button">Evidence lock</button>
