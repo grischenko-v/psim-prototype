@@ -881,13 +881,13 @@ h4 {
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(240px, 0.55fr) minmax(240px, 0.55fr);
-  grid-template-rows: minmax(0, 1fr) minmax(170px, 0.42fr);
+  grid-template-columns: minmax(0, 1.85fr) minmax(220px, 0.48fr) minmax(220px, 0.48fr);
+  grid-template-rows: minmax(0, 1fr) minmax(150px, 0.34fr);
   gap: 16px;
 }
 
 .incident-layout.context-visible {
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) minmax(260px, 0.62fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.86fr) minmax(250px, 0.54fr);
 }
 
 .incident-screen {
@@ -1018,16 +1018,16 @@ h4 {
   counter-reset: sop;
   min-height: 0;
   overflow: auto;
-  padding-right: 4px;
+  padding-right: 6px;
 }
 
 .sop-list li {
-  min-height: 92px;
-  display: flex;
+  min-height: 154px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(126px, auto);
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px;
+  gap: 18px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-muted);
@@ -1036,23 +1036,22 @@ h4 {
 .sop-list li::before {
   counter-increment: sop;
   content: counter(sop);
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: #dbe4ee;
   color: #445468;
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: 1.08rem;
   flex: 0 0 auto;
 }
 
 .sop-step-body {
   min-width: 0;
   display: grid;
-  gap: 7px;
-  flex: 1;
+  gap: 10px;
 }
 
 .sop-step-body strong,
@@ -1062,26 +1061,33 @@ h4 {
 
 .sop-step-body span {
   color: var(--muted);
-  font-size: 0.96rem;
-  line-height: 1.45;
+  font-size: 1.15rem;
+  line-height: 1.55;
 }
 
 .sop-step-body strong {
-  font-size: 1.08rem;
-  line-height: 1.25;
+  font-size: 1.36rem;
+  line-height: 1.22;
 }
 
 .sop-step-media {
-  min-height: 112px;
-  margin-top: 6px;
+  min-height: 180px;
+  margin-top: 8px;
   border-radius: 8px;
   border: 1px solid #273545;
   background: linear-gradient(180deg, #243244, #121a24);
   color: #dfe9f5;
   display: grid;
   place-items: center;
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 800;
+}
+
+.sop-list li > .ghost-button {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  align-self: start;
 }
 
 .sop-list .done::before {

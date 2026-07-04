@@ -1,5 +1,5 @@
 import { createApp } from "vue";
-import App from "./App.vue?v=compact-shell-event-drawer";
-import "./styles.css?v=compact-shell-event-drawer";
+import App from "./App.vue?v=large-readable-sop";
+import "./styles.css?v=large-readable-sop";
 
 createApp(App).mount("#app");
