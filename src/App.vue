@@ -5,7 +5,7 @@ const screens = [
   {
     id: "monitoring",
     label: "Мониторинг",
-    subtitle: "Очередь тревог и общая картина",
+    subtitle: "Очередь инцидентов и общая картина",
     icon: ["M22 12h-4l-3 8-6-16-3 8H2"],
   },
   {
@@ -71,7 +71,9 @@ const state = reactive({
   cameraStatus: "all",
   selectedCameraIds: ["cam-12", "cam-14", "cam-18", "cam-21"],
   quadSlotCount: 4,
-  vmsFullscreen: false,
+  fullscreenScreen: null,
+  videoMode: "live",
+  archiveTime: "12:31:08",
   focusedCameraId: "cam-12",
   incidentComment: "",
   sopStepIndex: 2,
@@ -109,11 +111,35 @@ const archiveRangeOptions = [
 ];
 
 const sopSteps = [
-  "Принять инцидент оператором",
-  "Проверить видео за 30 секунд до тревоги",
-  "Связаться с постом охраны",
-  "Заблокировать соседние двери",
-  "Добавить комментарий и результат проверки",
+  {
+    title: "Принять инцидент оператором",
+    detail: "Зафиксировать ответственного, время принятия и источник первичного события.",
+  },
+  {
+    title: "Проверить видео за 30 секунд до тревоги",
+    detail: "Сравнить live и архивный фрагмент, отметить наличие человека, транспорта или ложного срабатывания.",
+    image: "Camera 12 / -00:30",
+  },
+  {
+    title: "Связаться с постом охраны",
+    detail: "Передать локацию, тип инцидента и запросить подтверждение обстановки на месте.",
+  },
+  {
+    title: "Заблокировать соседние двери",
+    detail: "Выполнить команду только после проверки, что блокировка не мешает эвакуации.",
+  },
+  {
+    title: "Добавить комментарий и результат проверки",
+    detail: "Кратко описать причину закрытия, эскалации или передачи следующей смене.",
+  },
+];
+
+const incidentCommands = [
+  { id: "unlock-door", label: "Открыть дверь D12", tone: "normal" },
+  { id: "lock-zone", label: "Заблокировать зону 2B", tone: "danger" },
+  { id: "ptz-preset", label: "PTZ на Door D12", tone: "normal" },
+  { id: "call-guard", label: "Вызвать пост охраны", tone: "normal" },
+  { id: "create-task", label: "Создать заявку технику", tone: "normal" },
 ];
 
 const incidents = [
@@ -442,9 +468,9 @@ function filteredPanelEvents(panel) {
   });
 }
 
-function confirmSopStep() {
-  if (state.sopStepIndex < sopSteps.length) {
-    state.sopStepIndex += 1;
+function confirmSopStep(index) {
+  if (index <= state.sopStepIndex && state.sopStepIndex < sopSteps.length) {
+    state.sopStepIndex = Math.max(state.sopStepIndex, index + 1);
   }
 }
 
@@ -490,10 +516,20 @@ function openMapFromCamera(cameraId) {
   state.focusedCameraId = cameraId;
   state.activeScreen = "map";
 }
+
+function toggleFullscreen(screenId) {
+  state.fullscreenScreen = state.fullscreenScreen === screenId ? null : screenId;
+}
 </script>
 
 <template>
-  <main class="app-shell" :class="{ 'sidebar-collapsed': state.sidebarCollapsed, 'vms-fullscreen': state.vmsFullscreen }">
+  <main
+    class="app-shell"
+    :class="{
+      'sidebar-collapsed': state.sidebarCollapsed,
+      'content-fullscreen': state.fullscreenScreen === state.activeScreen,
+    }"
+  >
     <aside class="sidebar" aria-label="Навигация по макетам">
       <div class="brand-block">
         <div class="brand-mark">PS</div>
@@ -551,7 +587,6 @@ function openMapFromCamera(cameraId) {
           </div>
         </div>
         <div class="topbar-actions">
-          <button class="ghost-button" type="button">Передать смену</button>
           <button class="primary-button" type="button">Создать событие</button>
         </div>
       </header>
@@ -560,7 +595,7 @@ function openMapFromCamera(cameraId) {
         <div class="main-grid">
           <section class="panel incident-queue">
             <div class="panel-header">
-              <h3>Очередь тревог</h3>
+              <h3>Очередь инцидентов</h3>
               <span>{{ filteredIncidents.length }} / {{ incidents.length }}</span>
             </div>
 
@@ -616,8 +651,8 @@ function openMapFromCamera(cameraId) {
 
           <section class="panel map-panel">
             <div class="panel-header">
-              <h3>Оперативная карта</h3>
-              <span>Здание A / этаж 2</span>
+              <h3>Карта выбранного инцидента</h3>
+              <span>INC-2481 / Здание A / этаж 2</span>
             </div>
             <div class="map-canvas compact-map">
               <div class="room room-a">Склад</div>
@@ -635,8 +670,8 @@ function openMapFromCamera(cameraId) {
 
           <section class="panel video-stack">
             <div class="panel-header">
-              <h3>Быстрая верификация</h3>
-              <span>4 камеры</span>
+              <h3>Камеры выбранного инцидента</h3>
+              <span>Door D12 / 2 рядом</span>
             </div>
             <div class="video-tile large-video">Camera 12</div>
             <div class="video-grid">
@@ -670,23 +705,46 @@ function openMapFromCamera(cameraId) {
             <ol class="sop-list">
               <li
                 v-for="(step, index) in sopSteps"
-                :key="step"
+                :key="step.title"
                 :class="{ done: index < state.sopStepIndex, active: index === state.sopStepIndex }"
               >
-                {{ step }}
+                <div class="sop-step-body">
+                  <strong>{{ step.title }}</strong>
+                  <span>{{ step.detail }}</span>
+                  <div v-if="step.image" class="sop-step-media">
+                    {{ step.image }}
+                  </div>
+                </div>
+                <button
+                  class="ghost-button compact-button"
+                  type="button"
+                  :disabled="index > state.sopStepIndex || index < state.sopStepIndex"
+                  @click="confirmSopStep(index)"
+                >
+                  {{ index < state.sopStepIndex ? "Готово" : "Подтвердить" }}
+                </button>
               </li>
             </ol>
             <div class="sop-actions">
-              <button
-                class="primary-button"
-                type="button"
-                :disabled="state.sopStepIndex >= sopSteps.length"
-                @click="confirmSopStep"
-              >
-                Подтвердить шаг
-              </button>
               <button class="danger-button" type="button" @click="finishIncident">
                 Завершить инцидент
+              </button>
+            </div>
+          </section>
+
+          <section class="panel command-panel">
+            <div class="panel-header">
+              <h3>Команды</h3>
+              <span>исполнение оператором</span>
+            </div>
+            <div class="command-grid">
+              <button
+                v-for="command in incidentCommands"
+                :key="command.id"
+                :class="command.tone === 'danger' ? 'danger-button' : 'ghost-button'"
+                type="button"
+              >
+                {{ command.label }}
               </button>
             </div>
           </section>
@@ -785,6 +843,9 @@ function openMapFromCamera(cameraId) {
               <span>фильтры независимы</span>
               <span>переход к инциденту</span>
             </div>
+            <button class="ghost-button compact-button" type="button" @click="toggleFullscreen('events')">
+              {{ state.fullscreenScreen === 'events' ? "Свернуть" : "На всю страницу" }}
+            </button>
           </div>
 
           <div class="event-workbench-actions">
@@ -1035,6 +1096,9 @@ function openMapFromCamera(cameraId) {
               <span>Здание A</span>
               <span>Этаж 2</span>
             </div>
+            <button class="ghost-button compact-button" type="button" @click="toggleFullscreen('map')">
+              {{ state.fullscreenScreen === 'map' ? "Свернуть" : "На всю страницу" }}
+            </button>
           </div>
           <div class="map-canvas full-map">
             <div class="room room-a">Зона 2A</div>
@@ -1126,9 +1190,11 @@ function openMapFromCamera(cameraId) {
             <h3>Квадратор</h3>
             <div class="filter-pills">
               <span>{{ state.selectedCameraIds.length }} / {{ state.quadSlotCount }}</span>
-              <span>Live</span>
-              <span>Архив</span>
+              <span>{{ state.videoMode === "live" ? "Live" : `Архив ${state.archiveTime}` }}</span>
             </div>
+            <button class="ghost-button compact-button" type="button" @click="toggleFullscreen('vms')">
+              {{ state.fullscreenScreen === 'vms' ? "Свернуть" : "На всю страницу" }}
+            </button>
           </div>
 
           <div class="quad-grid" :style="{ '--quad-columns': quadColumnCount }">
@@ -1141,6 +1207,7 @@ function openMapFromCamera(cameraId) {
               <template v-if="cameraItem">
                 <strong>{{ cameraItem.name }}</strong>
                 <small>{{ cameraItem.zone }}</small>
+                <small>{{ state.videoMode === "live" ? "Live stream" : `Archive ${state.archiveTime}` }}</small>
                 <button class="video-map-button" type="button" @click="openMapFromCamera(cameraItem.id)">
                   На карте
                 </button>
@@ -1156,9 +1223,10 @@ function openMapFromCamera(cameraId) {
             <button class="ghost-button" type="button" @click="setQuadSlotCount(9)">3x3</button>
             <button class="ghost-button" type="button" @click="setQuadSlotCount(16)">4x4</button>
             <button class="ghost-button" type="button" @click="setQuadSlotCount(32)">32 камеры</button>
-            <button class="ghost-button" type="button" @click="state.vmsFullscreen = !state.vmsFullscreen">
-              {{ state.vmsFullscreen ? "Обычный режим" : "На всю страницу" }}
+            <button class="ghost-button" type="button" @click="state.videoMode = state.videoMode === 'live' ? 'archive' : 'live'">
+              {{ state.videoMode === "live" ? "Открыть архив" : "Вернуться Live" }}
             </button>
+            <input v-if="state.videoMode === 'archive'" v-model="state.archiveTime" class="archive-time-input" type="time" step="1" />
             <button class="ghost-button" type="button">Bookmark</button>
             <button class="ghost-button" type="button">Snapshot</button>
             <button class="ghost-button" type="button">Evidence lock</button>
@@ -1188,29 +1256,77 @@ function openMapFromCamera(cameraId) {
             <strong>22%</strong>
             <small>за последние 24 часа</small>
           </section>
+          <section class="panel kpi-card">
+            <span>SLA риск</span>
+            <strong>4</strong>
+            <small>2 инцидента старше 10 минут</small>
+          </section>
         </div>
 
-        <section class="panel supervisor-board">
-          <div class="panel-header">
-            <h3>Нагрузка операторов</h3>
-            <span>SLA и handover</span>
-          </div>
-          <div class="operator-row">
-            <span>Иванов</span>
-            <div class="load-line"><span style="width: 82%"></span></div>
-            <strong>5</strong>
-          </div>
-          <div class="operator-row">
-            <span>Петрова</span>
-            <div class="load-line"><span style="width: 54%"></span></div>
-            <strong>3</strong>
-          </div>
-          <div class="operator-row">
-            <span>Смена 2</span>
-            <div class="load-line"><span style="width: 37%"></span></div>
-            <strong>2</strong>
-          </div>
-        </section>
+        <div class="supervisor-grid">
+          <section class="panel supervisor-board">
+            <div class="panel-header">
+              <h3>Нагрузка операторов</h3>
+              <span>SLA и handover</span>
+            </div>
+            <div class="operator-row">
+              <span>Иванов</span>
+              <div class="load-line"><span style="width: 82%"></span></div>
+              <strong>5</strong>
+            </div>
+            <div class="operator-row">
+              <span>Петрова</span>
+              <div class="load-line"><span style="width: 54%"></span></div>
+              <strong>3</strong>
+            </div>
+            <div class="operator-row">
+              <span>Смена 2</span>
+              <div class="load-line"><span style="width: 37%"></span></div>
+              <strong>2</strong>
+            </div>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <h3>Инциденты по источникам</h3>
+              <span>24 часа</span>
+            </div>
+            <div class="bar-list">
+              <div><span>СКУД</span><div class="load-line"><span style="width: 76%"></span></div><strong>18</strong></div>
+              <div><span>VMS</span><div class="load-line"><span style="width: 52%"></span></div><strong>12</strong></div>
+              <div><span>Датчики</span><div class="load-line"><span style="width: 38%"></span></div><strong>9</strong></div>
+            </div>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <h3>Тренд по часам</h3>
+              <span>закрыто / открыто</span>
+            </div>
+            <div class="sparkline-bars">
+              <span style="height: 28%"></span>
+              <span style="height: 42%"></span>
+              <span style="height: 35%"></span>
+              <span style="height: 68%"></span>
+              <span style="height: 54%"></span>
+              <span style="height: 82%"></span>
+              <span style="height: 46%"></span>
+              <span style="height: 63%"></span>
+            </div>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <h3>Топ зон</h3>
+              <span>по повторяемости</span>
+            </div>
+            <div class="zone-list">
+              <button type="button">Здание A / этаж 2 <strong>11</strong></button>
+              <button type="button">КПП-3 <strong>7</strong></button>
+              <button type="button">Парковка <strong>5</strong></button>
+            </div>
+          </section>
+        </div>
       </section>
     </section>
   </main>
