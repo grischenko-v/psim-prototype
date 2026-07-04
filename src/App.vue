@@ -51,9 +51,11 @@ const state = reactive({
   eventSearch: "",
   eventPriority: "all",
   eventStatus: "all",
-  selectedEventId: "evt-1",
+  selectedEventId: null,
+  activeEventPanelId: "events-1",
+  fullscreenEventPanelId: null,
   eventPanels: [
-    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "", selectedEventId: "evt-1" },
+    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "", selectedEventId: null },
   ],
   nextEventPanelIndex: 2,
   archiveSearch: "",
@@ -72,6 +74,7 @@ const state = reactive({
   archiveTime: "12:31:08",
   focusedCameraId: "cam-12",
   mapPreviewCameraId: "cam-12",
+  incidentContextVisible: false,
   incidentComment: "",
   sopStepIndex: 2,
 });
@@ -411,6 +414,21 @@ const eventSystemOptions = computed(() => ["all", ...new Set(eventRows.map((even
 
 const eventSourceOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.source))]);
 
+const activeEventPanel = computed(
+  () =>
+    state.eventPanels.find((panel) => panel.id === state.activeEventPanelId) ??
+    state.eventPanels[0] ??
+    null,
+);
+
+const visibleEventPanels = computed(() => {
+  if (!state.fullscreenEventPanelId) {
+    return state.eventPanels;
+  }
+
+  return state.eventPanels.filter((panel) => panel.id === state.fullscreenEventPanelId);
+});
+
 const filteredArchive = computed(() => {
   const query = normalize(state.archiveSearch);
 
@@ -546,11 +564,13 @@ function selectEvent(event, panel = null) {
   state.selectedIncident = event.incident;
 
   if (panel) {
+    state.activeEventPanelId = panel.id;
     panel.selectedEventId = event.id;
     return;
   }
 
   if (state.eventPanels[0]) {
+    state.activeEventPanelId = state.eventPanels[0].id;
     state.eventPanels[0].selectedEventId = event.id;
   }
 }
@@ -560,18 +580,19 @@ function addEventPanel(template = eventPanelTemplates[0]) {
     return;
   }
 
+  const panelId = `events-${state.nextEventPanelIndex}`;
+
   state.eventPanels.push({
-    id: `events-${state.nextEventPanelIndex}`,
+    id: panelId,
     title: template.title,
     system: template.system,
     source: "all",
     priority: "all",
     status: "all",
     query: "",
-    selectedEventId:
-      eventRows.find((event) => template.system === "all" || event.category === template.system)?.id ??
-      eventRows[0].id,
+    selectedEventId: null,
   });
+  state.activeEventPanelId = panelId;
   state.nextEventPanelIndex += 1;
 }
 
@@ -584,7 +605,35 @@ function removeEventPanel(panelId) {
 
   if (index >= 0) {
     state.eventPanels.splice(index, 1);
+
+    if (state.activeEventPanelId === panelId) {
+      state.activeEventPanelId =
+        state.eventPanels[Math.min(index, state.eventPanels.length - 1)]?.id ??
+        state.eventPanels[0]?.id ??
+        null;
+    }
+
+    if (state.fullscreenEventPanelId === panelId) {
+      state.fullscreenEventPanelId = null;
+    }
   }
+}
+
+function selectEventPanel(panelId) {
+  state.activeEventPanelId = panelId;
+}
+
+function toggleEventPanelFullscreen(panelId) {
+  state.fullscreenEventPanelId = state.fullscreenEventPanelId === panelId ? null : panelId;
+  state.activeEventPanelId = panelId;
+}
+
+function closeEventDetail(panel) {
+  if (state.selectedEventId === panel.selectedEventId) {
+    state.selectedEventId = null;
+  }
+
+  panel.selectedEventId = null;
 }
 
 function filteredPanelEvents(panel) {
@@ -602,9 +651,13 @@ function filteredPanelEvents(panel) {
 }
 
 function selectedEventForPanel(panel) {
+  if (!panel?.selectedEventId) {
+    return null;
+  }
+
   const events = filteredPanelEvents(panel);
 
-  return events.find((event) => event.id === panel.selectedEventId) ?? events[0] ?? null;
+  return events.find((event) => event.id === panel.selectedEventId) ?? null;
 }
 
 function confirmSopStep(index) {
@@ -908,15 +961,18 @@ onUnmounted(() => {
             <div class="incident-actions">
               <span class="timer">{{ selectedIncident.time }}</span>
               <button class="ghost-button" type="button" @click="showIncidentList">К списку</button>
+              <button class="ghost-button" type="button" @click="state.incidentContextVisible = !state.incidentContextVisible">
+                {{ state.incidentContextVisible ? "Скрыть контекст" : "Показать карту и видео" }}
+              </button>
               <button class="ghost-button" type="button">Назначить</button>
               <button class="danger-button" type="button">Эскалировать</button>
             </div>
           </div>
 
-          <div class="incident-layout">
+          <div class="incident-layout" :class="{ 'context-visible': state.incidentContextVisible }">
             <section class="panel sop-panel">
               <div class="panel-header">
-                <h3>SOP</h3>
+                <h3>Инструкция обработки</h3>
                 <span>{{ selectedIncident.status }}</span>
               </div>
               <ol class="sop-list">
@@ -966,7 +1022,7 @@ onUnmounted(() => {
               </div>
             </section>
 
-            <section class="panel map-panel">
+            <section v-if="state.incidentContextVisible" class="panel map-panel">
               <div class="panel-header">
                 <h3>Контекст места</h3>
                 <span>2 камеры рядом</span>
@@ -980,7 +1036,7 @@ onUnmounted(() => {
               </div>
             </section>
 
-            <section class="panel video-stack">
+            <section v-if="state.incidentContextVisible" class="panel video-stack">
               <div class="panel-header">
                 <h3>Видео</h3>
                 <span>pre/post alarm</span>
@@ -1067,32 +1123,67 @@ onUnmounted(() => {
           </div>
 
           <div class="event-workbench-actions">
-            <span>Открыть таблицу:</span>
-            <button
-              v-for="template in eventPanelTemplates"
-              :key="template.title"
-              class="ghost-button"
-              type="button"
-              :disabled="state.eventPanels.length >= 4"
-              @click="addEventPanel(template)"
-            >
-              + {{ template.title }}
-            </button>
+            <div class="event-add-actions">
+              <span>Открыть таблицу:</span>
+              <button
+                v-for="template in eventPanelTemplates"
+                :key="template.title"
+                class="ghost-button"
+                type="button"
+                :disabled="state.eventPanels.length >= 4"
+                @click="addEventPanel(template)"
+              >
+                + {{ template.title }}
+              </button>
+            </div>
+            <div class="event-tab-strip" aria-label="Открытые таблицы событий">
+              <button
+                v-for="panel in state.eventPanels"
+                :key="panel.id"
+                class="event-tab"
+                :class="{ active: activeEventPanel?.id === panel.id }"
+                type="button"
+                @click="selectEventPanel(panel.id)"
+              >
+                <strong>{{ panel.title }}</strong>
+                <span>{{ filteredPanelEvents(panel).length }} событий</span>
+                <em v-if="selectedEventForPanel(panel)">открыта карточка</em>
+              </button>
+            </div>
           </div>
 
           <div
-            class="event-panel-grid"
-            :class="{ 'single-event-panel-grid': state.eventPanels.length === 1 }"
+            class="event-panel-stage"
+            :class="{
+              'event-panel-stage-fullscreen': state.fullscreenEventPanelId,
+              'event-panel-stage-single': visibleEventPanels.length === 1,
+            }"
           >
-            <section v-for="panel in state.eventPanels" :key="panel.id" class="event-panel">
+            <section
+              v-for="panel in visibleEventPanels"
+              :key="panel.id"
+              class="event-panel"
+              :class="{ 'event-panel-active': activeEventPanel?.id === panel.id }"
+            >
               <div class="event-panel-title">
                 <div>
                   <h4>{{ panel.title }}</h4>
                   <span>{{ filteredPanelEvents(panel).length }} событий</span>
                 </div>
                 <div class="event-panel-actions">
-                  <button class="ghost-button compact-button" type="button" @click="panel.query = ''; panel.source = 'all'">
+                  <button
+                    class="ghost-button compact-button"
+                    type="button"
+                    @click="panel.query = ''; panel.source = 'all'"
+                  >
                     Сброс
+                  </button>
+                  <button
+                    class="ghost-button compact-button"
+                    type="button"
+                    @click="toggleEventPanelFullscreen(panel.id)"
+                  >
+                    {{ state.fullscreenEventPanelId === panel.id ? "Свернуть" : "Развернуть" }}
                   </button>
                   <button
                     class="ghost-button compact-button"
@@ -1144,54 +1235,105 @@ onUnmounted(() => {
                 </label>
               </div>
 
-              <div v-if="selectedEventForPanel(panel)" class="event-panel-detail">
-                <div class="event-panel-detail-main">
-                  <span class="event-time">{{ selectedEventForPanel(panel).time }}</span>
-                  <strong>{{ selectedEventForPanel(panel).type }}</strong>
-                  <small>
-                    {{ selectedEventForPanel(panel).category }} ·
-                    {{ selectedEventForPanel(panel).source }} ·
-                    {{ selectedEventForPanel(panel).location }}
-                  </small>
+              <div
+                class="event-table-stage"
+                :class="{ 'detail-open': selectedEventForPanel(panel) }"
+              >
+                <div v-if="selectedEventForPanel(panel)" class="event-panel-detail">
+                  <div class="event-detail-header">
+                    <div class="event-panel-detail-main">
+                      <span class="event-time">{{ selectedEventForPanel(panel).time }}</span>
+                      <strong>{{ selectedEventForPanel(panel).type }}</strong>
+                      <small>
+                        {{ selectedEventForPanel(panel).category }} ·
+                        {{ selectedEventForPanel(panel).source }} ·
+                        {{ selectedEventForPanel(panel).location }}
+                      </small>
+                    </div>
+                    <button
+                      class="icon-button detail-close-button"
+                      type="button"
+                      aria-label="Закрыть карточку события"
+                      @click="closeEventDetail(panel)"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div class="event-detail-grid">
+                    <span>
+                      Приоритет
+                      <strong>{{ selectedEventForPanel(panel).priority }}</strong>
+                    </span>
+                    <span>
+                      Статус
+                      <strong>{{ selectedEventForPanel(panel).status }}</strong>
+                    </span>
+                    <span>
+                      Инцидент
+                      <button
+                        class="incident-number-button"
+                        type="button"
+                        @click="openIncidentFromEvent(selectedEventForPanel(panel))"
+                      >
+                        {{ selectedEventForPanel(panel).incident }}
+                      </button>
+                    </span>
+                  </div>
+                  <div class="event-photo-grid">
+                    <div class="event-photo event-photo-main">
+                      <strong>{{ selectedEventForPanel(panel).source }}</strong>
+                      <small>кадр события</small>
+                    </div>
+                    <div class="event-photo">
+                      <strong>до события</strong>
+                      <small>-00:10</small>
+                    </div>
+                    <div class="event-photo">
+                      <strong>после события</strong>
+                      <small>+00:10</small>
+                    </div>
+                  </div>
+                  <div class="event-panel-payload">
+                    <code
+                      v-for="item in selectedEventForPanel(panel).payload"
+                      :key="`${panel.id}-${item}`"
+                    >
+                      {{ item }}
+                    </code>
+                  </div>
+                  <div class="event-panel-controls">
+                    <button class="ghost-button compact-button" type="button">Подтвердить</button>
+                    <button class="ghost-button compact-button" type="button">Команда</button>
+                    <button class="ghost-button compact-button" type="button">Открыть фото</button>
+                    <button class="primary-button compact-button" type="button">Создать действие</button>
+                  </div>
                 </div>
-                <button class="incident-number-button" type="button" @click="openIncidentFromEvent(selectedEventForPanel(panel))">
-                  {{ selectedEventForPanel(panel).incident }}
-                </button>
-                <div class="event-panel-payload">
-                  <code v-for="item in selectedEventForPanel(panel).payload.slice(0, 3)" :key="`${panel.id}-${item}`">
-                    {{ item }}
-                  </code>
-                </div>
-                <div class="event-panel-controls">
-                  <button class="ghost-button compact-button" type="button">Подтвердить</button>
-                  <button class="ghost-button compact-button" type="button">Команда</button>
-                </div>
-              </div>
 
-              <div class="mini-event-table">
-                <div
-                  v-for="event in filteredPanelEvents(panel)"
-                  :key="`${panel.id}-${event.time}-${event.source}`"
-                  class="mini-event-row"
-                  :class="{ selected: selectedEventForPanel(panel)?.id === event.id }"
-                  role="button"
-                  tabindex="0"
-                  @click="selectEvent(event, panel)"
-                  @keydown.enter="selectEvent(event, panel)"
-                  @keydown.space.prevent="selectEvent(event, panel)"
-                >
-                  <span class="event-time">{{ event.time }}</span>
-                  <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
-                  <span>
-                    <strong>{{ event.type }}</strong>
-                    <small>{{ event.category }} · {{ event.source }} · {{ event.location }}</small>
-                  </span>
-                  <button class="incident-number-button" type="button" @click.stop="openIncidentFromEvent(event)">
-                    {{ event.incident }}
-                  </button>
-                </div>
-                <div v-if="filteredPanelEvents(panel).length === 0" class="empty-state">
-                  Нет событий
+                <div class="mini-event-table">
+                  <div
+                    v-for="event in filteredPanelEvents(panel)"
+                    :key="`${panel.id}-${event.time}-${event.source}`"
+                    class="mini-event-row"
+                    :class="{ selected: selectedEventForPanel(panel)?.id === event.id }"
+                    role="button"
+                    tabindex="0"
+                    @click="selectEvent(event, panel)"
+                    @keydown.enter="selectEvent(event, panel)"
+                    @keydown.space.prevent="selectEvent(event, panel)"
+                  >
+                    <span class="event-time">{{ event.time }}</span>
+                    <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
+                    <span>
+                      <strong>{{ event.type }}</strong>
+                      <small>{{ event.category }} · {{ event.source }} · {{ event.location }}</small>
+                    </span>
+                    <button class="incident-number-button" type="button" @click.stop="openIncidentFromEvent(event)">
+                      {{ event.incident }}
+                    </button>
+                  </div>
+                  <div v-if="filteredPanelEvents(panel).length === 0" class="empty-state">
+                    Нет событий
+                  </div>
                 </div>
               </div>
             </section>
