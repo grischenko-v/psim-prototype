@@ -90,17 +90,33 @@ button:disabled {
   gap: 0;
 }
 
+.content-fullscreen .events-screen {
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 0;
+}
+
+.content-fullscreen .map-screen {
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 0;
+}
+
+.content-fullscreen .map-screen .object-panel {
+  display: grid;
+  border-left: 1px solid var(--line);
+  overflow: auto;
+}
+
 .content-fullscreen .camera-catalog,
 .content-fullscreen .vms-timeline,
-.content-fullscreen .layer-panel,
-.content-fullscreen .object-panel,
-.content-fullscreen .incident-link-panel {
+.content-fullscreen .layer-panel {
   display: none;
 }
 
 .content-fullscreen .vms-main,
 .content-fullscreen .event-workbench-panel,
-.content-fullscreen .full-map-panel {
+.content-fullscreen .full-map-panel,
+.content-fullscreen .object-panel,
+.content-fullscreen .event-detail-panel {
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -795,22 +811,59 @@ h4 {
 }
 
 .incident-layout {
+  height: 100%;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1fr) minmax(300px, 0.95fr);
-  grid-template-rows: auto auto;
+  grid-template-columns: minmax(300px, 0.86fr) minmax(360px, 1.2fr) minmax(270px, 0.82fr);
+  grid-template-rows: minmax(260px, 1.25fr) minmax(120px, 0.55fr) minmax(90px, 0.38fr);
   gap: 16px;
 }
 
-.journal-panel {
-  grid-column: 1 / -1;
+.incident-screen {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.linked-events-panel {
-  grid-column: 1 / -1;
+.sop-panel {
+  grid-row: 1 / 4;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.video-stack {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .command-panel {
+  grid-column: 3;
+  grid-row: 1;
   align-content: start;
+  padding: 12px;
+}
+
+.map-panel {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.journal-panel {
+  grid-column: 2;
+  grid-row: 3;
+  overflow: auto;
+}
+
+.linked-events-panel {
+  grid-column: 3;
+  grid-row: 2 / 4;
+  overflow: auto;
 }
 
 .linked-event-list {
@@ -849,6 +902,9 @@ h4 {
 
 .sop-list {
   counter-reset: sop;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .sop-list li {
@@ -967,8 +1023,30 @@ h4 {
 
 .command-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.command-grid .ghost-button,
+.command-grid .danger-button {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.incident-screen .large-video {
+  min-height: 0;
+  height: 100%;
+}
+
+.incident-screen .timeline {
+  height: 34px;
+}
+
+.incident-map {
+  min-height: 0;
+  height: 100%;
 }
 
 .comment-box {
@@ -1007,12 +1085,17 @@ h4 {
 }
 
 .events-screen {
+  height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) 370px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
 }
 
 .event-workbench-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -1024,6 +1107,7 @@ h4 {
 }
 
 .event-panel-grid {
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
@@ -1035,6 +1119,9 @@ h4 {
 
 .event-panel {
   min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f8fafc;
@@ -1088,8 +1175,9 @@ h4 {
 
 .mini-event-table {
   display: grid;
+  align-content: start;
   gap: 6px;
-  max-height: 310px;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -1154,12 +1242,18 @@ h4 {
 }
 
 .incident-link-panel {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
 }
 
 .event-detail-body {
+  min-height: 0;
   display: grid;
   gap: 12px;
+  overflow: auto;
+  padding-right: 4px;
 }
 
 .event-detail-body h3 {
@@ -1236,7 +1330,7 @@ h4 {
 
 .event-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1266,11 +1360,11 @@ h4 {
 }
 
 .compact-relations {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .compact-relations button {
-  min-height: 66px;
+  min-height: 58px;
 }
 
 .archive-screen {
@@ -1489,6 +1583,8 @@ h4 {
 }
 
 .map-screen {
+  height: 100%;
+  min-height: 0;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 280px;
   gap: 16px;
@@ -1508,12 +1604,46 @@ h4 {
 }
 
 .full-map {
-  min-height: 640px;
+  min-height: 0;
+  height: 100%;
 }
 
 .object-panel p {
   color: var(--muted);
   line-height: 1.5;
+}
+
+.full-map-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.object-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.device-info-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.device-info-grid span {
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.device-info-grid strong {
+  color: var(--ink);
 }
 
 .map-preview {
@@ -1525,6 +1655,34 @@ h4 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.device-command-panel,
+.device-events {
+  display: grid;
+  gap: 8px;
+}
+
+.device-events button {
+  min-height: 48px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 8px;
+  text-align: left;
+}
+
+.device-events span,
+.device-events small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.device-events small {
+  color: var(--ink);
 }
 
 .vms-screen {
@@ -1808,8 +1966,30 @@ h4 {
   .incident-layout,
   .map-screen,
   .vms-screen,
+  .events-screen,
   .event-panel-grid {
     grid-template-columns: 1fr;
+  }
+
+  .incident-layout,
+  .events-screen,
+  .map-screen {
+    height: auto;
+    overflow: auto;
+  }
+
+  .incident-layout {
+    grid-template-rows: none;
+  }
+
+  .sop-panel,
+  .video-stack,
+  .command-panel,
+  .map-panel,
+  .linked-events-panel,
+  .journal-panel {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .event-panel-filters {
@@ -1867,6 +2047,8 @@ h4 {
   .preview-strip,
   .quad-grid,
   .linked-event-list,
+  .event-controls,
+  .event-payload,
   .relation-strip {
     grid-template-columns: 1fr;
   }

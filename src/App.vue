@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive } from "vue";
+import { computed, onMounted, onUnmounted, reactive } from "vue";
 
 const screens = [
   {
@@ -356,6 +356,8 @@ const cameras = [
   }),
 ];
 
+const screenIds = new Set(screens.map((screen) => screen.id));
+
 const selectedIncident = computed(
   () =>
     [...incidents, ...completedIncidents].find((incident) => incident.id === state.selectedIncident) ??
@@ -489,6 +491,45 @@ const mapPreviewCamera = computed(
   () => cameras.find((camera) => camera.id === state.mapPreviewCameraId) ?? cameras[0],
 );
 
+const mapDeviceEvents = computed(() =>
+  eventRows.filter(
+    (event) =>
+      event.source === mapPreviewCamera.value.name ||
+      event.payload?.some((item) => item.includes(mapPreviewCamera.value.id)) ||
+      event.source === "Door D12",
+  ),
+);
+
+function screenFromRoute() {
+  if (typeof window === "undefined") return null;
+
+  const route = window.location.hash.replace(/^#\/?/, "");
+
+  return screenIds.has(route) ? route : null;
+}
+
+function setActiveScreen(screenId, updateRoute = true) {
+  if (!screenIds.has(screenId)) return;
+
+  state.activeScreen = screenId;
+
+  if (updateRoute && typeof window !== "undefined") {
+    const nextHash = `#/${screenId}`;
+
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
+    }
+  }
+}
+
+function syncScreenFromRoute() {
+  const routeScreen = screenFromRoute();
+
+  if (routeScreen) {
+    state.activeScreen = routeScreen;
+  }
+}
+
 function normalize(value) {
   return String(value).trim().toLowerCase();
 }
@@ -497,7 +538,7 @@ function selectIncident(id) {
   state.selectedIncident = id;
   state.sopStepIndex = 2;
   state.incidentComment = "";
-  state.activeScreen = "incident";
+  setActiveScreen("incident");
 }
 
 function openIncidentFromEvent(event) {
@@ -561,7 +602,7 @@ function confirmSopStep(index) {
 function finishIncident() {
   state.incidentComment = "";
   state.sopStepIndex = sopSteps.length;
-  state.activeScreen = "archive";
+  setActiveScreen("archive");
 }
 
 function toggleCamera(cameraId) {
@@ -599,12 +640,21 @@ function openCameraFromMap(cameraId) {
 function openMapFromCamera(cameraId) {
   state.focusedCameraId = cameraId;
   state.mapPreviewCameraId = cameraId;
-  state.activeScreen = "map";
+  setActiveScreen("map");
 }
 
 function toggleFullscreen(screenId) {
   state.fullscreenScreen = state.fullscreenScreen === screenId ? null : screenId;
 }
+
+onMounted(() => {
+  syncScreenFromRoute();
+  window.addEventListener("hashchange", syncScreenFromRoute);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("hashchange", syncScreenFromRoute);
+});
 </script>
 
 <template>
@@ -631,7 +681,7 @@ function toggleFullscreen(screenId) {
           class="nav-item"
           :class="{ 'nav-item-active': state.activeScreen === screen.id }"
           type="button"
-          @click="state.activeScreen = screen.id"
+          @click="setActiveScreen(screen.id)"
           :title="screen.label"
         >
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -871,7 +921,7 @@ function toggleFullscreen(screenId) {
                 :key="`${event.time}-${event.source}`"
                 class="linked-event"
                 type="button"
-                @click="state.activeScreen = 'events'"
+                @click="setActiveScreen('events')"
               >
                 <span>{{ event.time }}</span>
                 <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
@@ -1237,6 +1287,12 @@ function toggleFullscreen(screenId) {
             <span>Alarm</span>
           </div>
           <p>Ближайшие камеры: Camera 12, Camera 14</p>
+          <div class="device-info-grid">
+            <span>Устройство <strong>{{ mapPreviewCamera.name }}</strong></span>
+            <span>Статус <strong>{{ mapPreviewCamera.status }}</strong></span>
+            <span>Зона <strong>{{ mapPreviewCamera.zone }}</strong></span>
+            <span>Теги <strong>{{ mapPreviewCamera.tags }}</strong></span>
+          </div>
           <div class="map-preview video-tile" :class="{ 'warning-video': mapPreviewCamera.status === 'offline' }">
             <strong>{{ mapPreviewCamera.name }}</strong>
             <small>{{ mapPreviewCamera.zone }}</small>
@@ -1247,6 +1303,27 @@ function toggleFullscreen(screenId) {
             <button class="ghost-button" type="button" @click="openCameraFromMap('cam-14')">Camera 14</button>
             <button class="ghost-button" type="button">История</button>
             <button class="primary-button" type="button">Открыть SOP</button>
+          </div>
+          <div class="device-command-panel">
+            <strong>Команды устройству</strong>
+            <div class="object-actions">
+              <button class="ghost-button compact-button" type="button">PTZ preset</button>
+              <button class="ghost-button compact-button" type="button">Открыть дверь</button>
+              <button class="ghost-button compact-button" type="button">Запросить архив</button>
+              <button class="danger-button compact-button" type="button">Блокировать</button>
+            </div>
+          </div>
+          <div class="device-events">
+            <strong>Последние события</strong>
+            <button
+              v-for="event in mapDeviceEvents"
+              :key="`map-device-${event.id}`"
+              type="button"
+              @click="selectEvent(event); setActiveScreen('events')"
+            >
+              <span>{{ event.time }}</span>
+              <small>{{ event.type }} · {{ event.source }}</small>
+            </button>
           </div>
         </section>
       </section>
