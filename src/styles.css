@@ -1106,6 +1106,19 @@ h4 {
   color: var(--ink);
   padding: 8px;
   text-align: left;
+  cursor: pointer;
+}
+
+.mini-event-row:hover,
+.mini-event-row.selected,
+.relation-strip button.selected {
+  border-color: #2b64c5;
+  background: #f2f7ff;
+}
+
+.mini-event-row:focus-visible {
+  outline: 2px solid #2b64c5;
+  outline-offset: 2px;
 }
 
 .mini-event-row strong,
@@ -1119,11 +1132,19 @@ h4 {
   font-size: 0.74rem;
 }
 
-.mini-event-row em {
+.incident-number-button {
+  min-height: 30px;
+  border: 1px solid #bfd0e5;
+  border-radius: 7px;
+  background: #ffffff;
   color: var(--blue-dark);
   font-size: 0.78rem;
-  font-style: normal;
   font-weight: 850;
+}
+
+.incident-number-button:hover {
+  border-color: #2b64c5;
+  background: #eef5ff;
 }
 
 .event-time {
@@ -1134,6 +1155,89 @@ h4 {
 
 .incident-link-panel {
   overflow: hidden;
+}
+
+.event-detail-body {
+  display: grid;
+  gap: 12px;
+}
+
+.event-detail-body h3 {
+  margin: 4px 0;
+  font-size: 1.05rem;
+}
+
+.event-detail-body p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.event-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.event-detail-grid span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.event-detail-grid strong {
+  color: var(--ink);
+}
+
+.event-media {
+  min-height: 112px;
+}
+
+.event-media strong,
+.event-media small,
+.map-preview strong,
+.map-preview small {
+  position: relative;
+  z-index: 2;
+  display: block;
+  text-align: center;
+}
+
+.event-media small,
+.map-preview small {
+  color: #aab8c8;
+  font-size: 0.78rem;
+}
+
+.event-payload {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.event-payload strong {
+  grid-column: 1 / -1;
+}
+
+.event-payload code {
+  min-width: 0;
+  border: 1px solid #dbe4ef;
+  border-radius: 7px;
+  background: #f8fafc;
+  padding: 7px 8px;
+  color: #2f3e50;
+  font-size: 0.76rem;
+  white-space: normal;
+}
+
+.event-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .relation-strip {
@@ -1159,6 +1263,14 @@ h4 {
 .relation-strip small {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.compact-relations {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compact-relations button {
+  min-height: 66px;
 }
 
 .archive-screen {
@@ -1402,6 +1514,17 @@ h4 {
 .object-panel p {
   color: var(--muted);
   line-height: 1.5;
+}
+
+.map-preview {
+  min-height: 148px;
+  margin: 12px 0;
+}
+
+.object-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .vms-screen {

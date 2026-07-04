@@ -56,6 +56,7 @@ const state = reactive({
   eventSearch: "",
   eventPriority: "all",
   eventStatus: "all",
+  selectedEventId: "evt-1",
   eventPanels: [
     { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "" },
   ],
@@ -75,6 +76,7 @@ const state = reactive({
   videoMode: "live",
   archiveTime: "12:31:08",
   focusedCameraId: "cam-12",
+  mapPreviewCameraId: "cam-12",
   incidentComment: "",
   sopStepIndex: 2,
 });
@@ -194,12 +196,81 @@ const incidents = [
 ];
 
 const eventRows = [
-  { time: "12:31:08", priority: "HIGH", type: "Взлом двери", source: "Door D12", status: "Новое", incident: "INC-2481", location: "Здание A / этаж 2", category: "СКУД" },
-  { time: "12:30:55", priority: "MED", type: "Движение в зоне", source: "Motion 2B", status: "Связано", incident: "INC-2481", location: "Здание A / этаж 2", category: "Датчик" },
-  { time: "12:30:44", priority: "HIGH", type: "Видеоаналитика", source: "Camera 12", status: "Связано", incident: "INC-2481", location: "Здание A / этаж 2", category: "VMS" },
-  { time: "12:30:30", priority: "LOW", type: "Потеря сигнала", source: "Camera 18", status: "В работе", incident: "INC-2479", location: "КПП-3", category: "VMS" },
-  { time: "12:28:19", priority: "MED", type: "Доступ запрещен", source: "Turnstile 4", status: "Закрыто", incident: "INC-2476", location: "Лобби", category: "СКУД" },
-  { time: "12:25:02", priority: "LOW", type: "Дверь открыта долго", source: "Door C04", status: "Ложное", incident: "INC-2475", location: "Здание C", category: "СКУД" },
+  {
+    id: "evt-1",
+    time: "12:31:08",
+    priority: "HIGH",
+    type: "Взлом двери",
+    source: "Door D12",
+    status: "Новое",
+    incident: "INC-2481",
+    location: "Здание A / этаж 2",
+    category: "СКУД",
+    media: "Фото прохода D12",
+    payload: ["doorId: D12", "cardId: 4421", "result: forced_open", "confidence: 0.96"],
+  },
+  {
+    id: "evt-2",
+    time: "12:30:55",
+    priority: "MED",
+    type: "Движение в зоне",
+    source: "Motion 2B",
+    status: "Связано",
+    incident: "INC-2481",
+    location: "Здание A / этаж 2",
+    category: "Датчик",
+    payload: ["zone: 2B", "sensor: PIR-2B-04", "duration: 18 сек", "threshold: exceeded"],
+  },
+  {
+    id: "evt-3",
+    time: "12:30:44",
+    priority: "HIGH",
+    type: "Видеоаналитика",
+    source: "Camera 12",
+    status: "Связано",
+    incident: "INC-2481",
+    location: "Здание A / этаж 2",
+    category: "VMS",
+    media: "Кадр Camera 12",
+    payload: ["cameraId: cam-12", "rule: line_crossing", "object: person", "confidence: 0.89"],
+  },
+  {
+    id: "evt-4",
+    time: "12:30:30",
+    priority: "LOW",
+    type: "Потеря сигнала",
+    source: "Camera 18",
+    status: "В работе",
+    incident: "INC-2478",
+    location: "КПП-3",
+    category: "VMS",
+    payload: ["cameraId: cam-18", "health: offline", "lastFrame: 12:29:57", "reason: no_signal"],
+  },
+  {
+    id: "evt-5",
+    time: "12:28:19",
+    priority: "MED",
+    type: "Доступ запрещен",
+    source: "Turnstile 4",
+    status: "Закрыто",
+    incident: "INC-2476",
+    location: "Лобби",
+    category: "СКУД",
+    media: "Фото турникета",
+    payload: ["readerId: T4", "cardId: 9810", "result: denied", "reason: expired"],
+  },
+  {
+    id: "evt-6",
+    time: "12:25:02",
+    priority: "LOW",
+    type: "Дверь открыта долго",
+    source: "Door C04",
+    status: "Ложное",
+    incident: "INC-2475",
+    location: "Здание C",
+    category: "СКУД",
+    payload: ["doorId: C04", "openDuration: 04:12", "operator: Иванов", "resolution: false_alarm"],
+  },
 ];
 
 const completedIncidents = [
@@ -339,6 +410,10 @@ const selectedIncidentEvents = computed(() =>
   eventRows.filter((event) => event.incident === state.selectedIncident),
 );
 
+const selectedEvent = computed(
+  () => eventRows.find((event) => event.id === state.selectedEventId) ?? eventRows[0],
+);
+
 const eventSystemOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.category))]);
 
 const eventSourceOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.source))]);
@@ -410,6 +485,10 @@ const quadColumnCount = computed(() => {
   return 8;
 });
 
+const mapPreviewCamera = computed(
+  () => cameras.find((camera) => camera.id === state.mapPreviewCameraId) ?? cameras[0],
+);
+
 function normalize(value) {
   return String(value).trim().toLowerCase();
 }
@@ -423,6 +502,11 @@ function selectIncident(id) {
 
 function openIncidentFromEvent(event) {
   selectIncident(event.incident);
+}
+
+function selectEvent(event) {
+  state.selectedEventId = event.id;
+  state.selectedIncident = event.incident;
 }
 
 function addEventPanel(template = eventPanelTemplates[0]) {
@@ -509,11 +593,12 @@ function openCameraFromMap(cameraId) {
     state.selectedCameraIds.push(cameraId);
   }
   state.focusedCameraId = cameraId;
-  state.activeScreen = "vms";
+  state.mapPreviewCameraId = cameraId;
 }
 
 function openMapFromCamera(cameraId) {
   state.focusedCameraId = cameraId;
+  state.mapPreviewCameraId = cameraId;
   state.activeScreen = "map";
 }
 
@@ -927,12 +1012,16 @@ function toggleFullscreen(screenId) {
               </div>
 
               <div class="mini-event-table">
-                <button
+                <div
                   v-for="event in filteredPanelEvents(panel)"
                   :key="`${panel.id}-${event.time}-${event.source}`"
                   class="mini-event-row"
-                  type="button"
-                  @click="openIncidentFromEvent(event)"
+                  :class="{ selected: selectedEvent.id === event.id }"
+                  role="button"
+                  tabindex="0"
+                  @click="selectEvent(event)"
+                  @keydown.enter="selectEvent(event)"
+                  @keydown.space.prevent="selectEvent(event)"
                 >
                   <span class="event-time">{{ event.time }}</span>
                   <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
@@ -940,8 +1029,10 @@ function toggleFullscreen(screenId) {
                     <strong>{{ event.type }}</strong>
                     <small>{{ event.category }} · {{ event.source }} · {{ event.location }}</small>
                   </span>
-                  <em>{{ event.incident }}</em>
-                </button>
+                  <button class="incident-number-button" type="button" @click.stop="openIncidentFromEvent(event)">
+                    {{ event.incident }}
+                  </button>
+                </div>
                 <div v-if="filteredPanelEvents(panel).length === 0" class="empty-state">
                   Нет событий
                 </div>
@@ -950,24 +1041,50 @@ function toggleFullscreen(screenId) {
           </div>
         </section>
 
-        <section class="panel incident-link-panel">
+        <section class="panel incident-link-panel event-detail-panel">
           <div class="panel-header">
-            <h3>Связи событий и инцидентов</h3>
-            <span>выбран: {{ selectedIncident.id }}</span>
-          </div>
-          <div class="relation-strip">
-            <button
-              v-for="event in selectedIncidentEvents"
-              :key="`relation-${event.time}-${event.source}`"
-              type="button"
-              @click="openIncidentFromEvent(event)"
-            >
-              <span>{{ event.time }}</span>
-              <strong>{{ event.type }}</strong>
-              <small>{{ event.source }} → {{ event.incident }}</small>
+            <h3>Карточка события</h3>
+            <button class="incident-number-button" type="button" @click="openIncidentFromEvent(selectedEvent)">
+              {{ selectedEvent.incident }}
             </button>
-            <div v-if="selectedIncidentEvents.length === 0" class="empty-state">
-              Выберите событие, чтобы перейти к связанному инциденту
+          </div>
+          <div class="event-detail-body">
+            <div>
+              <span class="event-time">{{ selectedEvent.time }}</span>
+              <h3>{{ selectedEvent.type }}</h3>
+              <p>{{ selectedEvent.category }} · {{ selectedEvent.source }} · {{ selectedEvent.location }}</p>
+            </div>
+            <div class="event-detail-grid">
+              <span>Приоритет <strong>{{ selectedEvent.priority }}</strong></span>
+              <span>Статус <strong>{{ selectedEvent.status }}</strong></span>
+              <span>Источник <strong>{{ selectedEvent.source }}</strong></span>
+            </div>
+            <div v-if="selectedEvent.media" class="event-media video-tile">
+              <strong>{{ selectedEvent.media }}</strong>
+              <small>{{ selectedEvent.location }}</small>
+            </div>
+            <div class="event-payload">
+              <strong>Набор данных</strong>
+              <code v-for="item in selectedEvent.payload" :key="item">{{ item }}</code>
+            </div>
+            <div class="event-controls">
+              <button class="ghost-button" type="button">Подтвердить</button>
+              <button class="ghost-button" type="button">Открыть дверь</button>
+              <button class="ghost-button" type="button">PTZ к источнику</button>
+              <button class="primary-button" type="button">Создать команду</button>
+            </div>
+            <div class="relation-strip compact-relations">
+              <button
+                v-for="event in selectedIncidentEvents"
+                :key="`relation-${event.time}-${event.source}`"
+                type="button"
+                :class="{ selected: selectedEvent.id === event.id }"
+                @click="selectEvent(event)"
+              >
+                <span>{{ event.time }}</span>
+                <strong>{{ event.type }}</strong>
+                <small>{{ event.source }}</small>
+              </button>
             </div>
           </div>
         </section>
@@ -1120,8 +1237,14 @@ function toggleFullscreen(screenId) {
             <span>Alarm</span>
           </div>
           <p>Ближайшие камеры: Camera 12, Camera 14</p>
+          <div class="map-preview video-tile" :class="{ 'warning-video': mapPreviewCamera.status === 'offline' }">
+            <strong>{{ mapPreviewCamera.name }}</strong>
+            <small>{{ mapPreviewCamera.zone }}</small>
+            <small>{{ mapPreviewCamera.status === "online" ? "Live stream" : "Нет сигнала" }}</small>
+          </div>
           <div class="object-actions">
-            <button class="ghost-button" type="button" @click="openCameraFromMap('cam-12')">Видео</button>
+            <button class="ghost-button" type="button" @click="openCameraFromMap('cam-12')">Camera 12</button>
+            <button class="ghost-button" type="button" @click="openCameraFromMap('cam-14')">Camera 14</button>
             <button class="ghost-button" type="button">История</button>
             <button class="primary-button" type="button">Открыть SOP</button>
           </div>
