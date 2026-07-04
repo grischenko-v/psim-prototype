@@ -44,7 +44,7 @@ const state = reactive({
   activeScreen: "incident",
   selectedIncident: "INC-2481",
   incidentListVisible: true,
-  sidebarCollapsed: false,
+  sidebarCollapsed: true,
   incidentSearch: "",
   incidentSeverity: "all",
   incidentPreset: "all",
@@ -55,7 +55,7 @@ const state = reactive({
   activeEventPanelId: "events-1",
   fullscreenEventPanelId: null,
   eventPanels: [
-    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "", selectedEventId: null },
+    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "", selectedEventId: null, filtersOpen: false },
   ],
   nextEventPanelIndex: 2,
   archiveSearch: "",
@@ -591,6 +591,7 @@ function addEventPanel(template = eventPanelTemplates[0]) {
     status: "all",
     query: "",
     selectedEventId: null,
+    filtersOpen: false,
   });
   state.activeEventPanelId = panelId;
   state.nextEventPanelIndex += 1;
@@ -729,7 +730,7 @@ onUnmounted(() => {
   <main
     class="app-shell"
     :class="{
-      'sidebar-collapsed': state.sidebarCollapsed,
+      'sidebar-collapsed': true,
       'content-fullscreen': state.fullscreenScreen === state.activeScreen,
     }"
   >
@@ -773,24 +774,22 @@ onUnmounted(() => {
     </aside>
 
     <section class="workspace">
+      <button
+        v-if="state.fullscreenScreen === state.activeScreen"
+        class="fullscreen-exit-button"
+        type="button"
+        @click="toggleFullscreen(state.activeScreen)"
+      >
+        Свернуть
+      </button>
+
       <header class="topbar">
-        <div class="topbar-title">
-          <button
-            class="icon-button"
-            type="button"
-            :aria-label="state.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
-            :title="state.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
-            @click="state.sidebarCollapsed = !state.sidebarCollapsed"
-          >
-            {{ state.sidebarCollapsed ? "☰" : "←" }}
-          </button>
+        <div class="topbar-pill">
           <div>
-            <p class="eyebrow">Command center / Северный кампус</p>
-            <h2>{{ screens.find((screen) => screen.id === state.activeScreen)?.label }}</h2>
+            <span>Command center / Северный кампус</span>
+            <strong>{{ screens.find((screen) => screen.id === state.activeScreen)?.label }}</strong>
           </div>
-        </div>
-        <div class="topbar-actions">
-          <button class="primary-button" type="button">Создать событие</button>
+          <button class="primary-button compact-create-button" type="button">Создать событие</button>
         </div>
       </header>
 
@@ -1174,7 +1173,15 @@ onUnmounted(() => {
                   <button
                     class="ghost-button compact-button"
                     type="button"
-                    @click="panel.query = ''; panel.source = 'all'"
+                    @click="panel.filtersOpen = !panel.filtersOpen"
+                  >
+                    {{ panel.filtersOpen ? "Скрыть фильтры" : "Фильтры" }}
+                  </button>
+                  <button
+                    v-if="panel.filtersOpen"
+                    class="ghost-button compact-button"
+                    type="button"
+                    @click="panel.query = ''; panel.source = 'all'; panel.system = 'all'; panel.priority = 'all'; panel.status = 'all'"
                   >
                     Сброс
                   </button>
@@ -1196,7 +1203,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <div class="event-panel-filters">
+              <div v-if="panel.filtersOpen" class="event-panel-filters">
                 <label class="search-field">
                   <span>Поиск</span>
                   <input v-model="panel.query" type="search" placeholder="INC, источник, зона" />
