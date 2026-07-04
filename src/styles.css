@@ -850,6 +850,15 @@ h4 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.incident-screen.incident-list-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.incident-screen.incident-list-mode .incident-worklist {
+  width: 100%;
+  max-width: 760px;
+}
+
 .incident-focus {
   min-width: 0;
   min-height: 0;

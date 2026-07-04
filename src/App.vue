@@ -835,7 +835,10 @@ onUnmounted(() => {
       <section
         v-else-if="state.activeScreen === 'incident'"
         class="screen incident-screen"
-        :class="{ 'incident-list-hidden': !state.incidentListVisible }"
+        :class="{
+          'incident-list-hidden': !state.incidentListVisible,
+          'incident-list-mode': state.incidentListVisible,
+        }"
       >
         <section v-if="state.incidentListVisible" class="panel incident-queue incident-worklist">
           <div class="panel-header">
@@ -895,7 +898,7 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <div class="incident-focus">
+        <div v-else class="incident-focus">
           <div class="incident-hero">
             <div>
               <p class="eyebrow">{{ selectedIncident.id }} / {{ selectedIncident.source }}</p>
