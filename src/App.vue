@@ -3,15 +3,9 @@ import { computed, onMounted, onUnmounted, reactive } from "vue";
 
 const screens = [
   {
-    id: "monitoring",
-    label: "Мониторинг",
-    subtitle: "Очередь инцидентов и общая картина",
-    icon: ["M22 12h-4l-3 8-6-16-3 8H2"],
-  },
-  {
     id: "incident",
     label: "Инцидент",
-    subtitle: "SOP, видео, карта и журнал",
+    subtitle: "Очередь, SOP, видео и журнал",
     icon: ["M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z", "M12 9v4", "M12 17h.01"],
   },
   {
@@ -47,8 +41,9 @@ const screens = [
 ];
 
 const state = reactive({
-  activeScreen: "monitoring",
+  activeScreen: "incident",
   selectedIncident: "INC-2481",
+  incidentListVisible: true,
   sidebarCollapsed: false,
   incidentSearch: "",
   incidentSeverity: "all",
@@ -58,7 +53,7 @@ const state = reactive({
   eventStatus: "all",
   selectedEventId: "evt-1",
   eventPanels: [
-    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "" },
+    { id: "events-1", title: "Все события", system: "all", source: "all", priority: "all", status: "all", query: "", selectedEventId: "evt-1" },
   ],
   nextEventPanelIndex: 2,
   archiveSearch: "",
@@ -412,10 +407,6 @@ const selectedIncidentEvents = computed(() =>
   eventRows.filter((event) => event.incident === state.selectedIncident),
 );
 
-const selectedEvent = computed(
-  () => eventRows.find((event) => event.id === state.selectedEventId) ?? eventRows[0],
-);
-
 const eventSystemOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.category))]);
 
 const eventSourceOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.source))]);
@@ -536,6 +527,7 @@ function normalize(value) {
 
 function selectIncident(id) {
   state.selectedIncident = id;
+  state.incidentListVisible = false;
   state.sopStepIndex = 2;
   state.incidentComment = "";
   setActiveScreen("incident");
@@ -545,9 +537,22 @@ function openIncidentFromEvent(event) {
   selectIncident(event.incident);
 }
 
-function selectEvent(event) {
+function showIncidentList() {
+  state.incidentListVisible = true;
+}
+
+function selectEvent(event, panel = null) {
   state.selectedEventId = event.id;
   state.selectedIncident = event.incident;
+
+  if (panel) {
+    panel.selectedEventId = event.id;
+    return;
+  }
+
+  if (state.eventPanels[0]) {
+    state.eventPanels[0].selectedEventId = event.id;
+  }
 }
 
 function addEventPanel(template = eventPanelTemplates[0]) {
@@ -563,6 +568,9 @@ function addEventPanel(template = eventPanelTemplates[0]) {
     priority: "all",
     status: "all",
     query: "",
+    selectedEventId:
+      eventRows.find((event) => template.system === "all" || event.category === template.system)?.id ??
+      eventRows[0].id,
   });
   state.nextEventPanelIndex += 1;
 }
@@ -593,6 +601,12 @@ function filteredPanelEvents(panel) {
   });
 }
 
+function selectedEventForPanel(panel) {
+  const events = filteredPanelEvents(panel);
+
+  return events.find((event) => event.id === panel.selectedEventId) ?? events[0] ?? null;
+}
+
 function confirmSopStep(index) {
   if (index <= state.sopStepIndex && state.sopStepIndex < sopSteps.length) {
     state.sopStepIndex = Math.max(state.sopStepIndex, index + 1);
@@ -602,7 +616,8 @@ function confirmSopStep(index) {
 function finishIncident() {
   state.incidentComment = "";
   state.sopStepIndex = sopSteps.length;
-  setActiveScreen("archive");
+  state.incidentListVisible = true;
+  setActiveScreen("incident");
 }
 
 function toggleCamera(cameraId) {
@@ -817,154 +832,219 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section v-else-if="state.activeScreen === 'incident'" class="screen incident-screen">
-        <div class="incident-hero">
-          <div>
-            <p class="eyebrow">{{ selectedIncident.id }} / {{ selectedIncident.source }}</p>
-            <h3>{{ selectedIncident.title }}</h3>
-            <p>{{ selectedIncident.location }}</p>
+      <section
+        v-else-if="state.activeScreen === 'incident'"
+        class="screen incident-screen"
+        :class="{ 'incident-list-hidden': !state.incidentListVisible }"
+      >
+        <section v-if="state.incidentListVisible" class="panel incident-queue incident-worklist">
+          <div class="panel-header">
+            <h3>Очередь инцидентов</h3>
+            <span>{{ filteredIncidents.length }} / {{ incidents.length }}</span>
           </div>
-          <div class="incident-actions">
-            <span class="timer">{{ selectedIncident.time }}</span>
-            <button class="ghost-button" type="button">Назначить</button>
-            <button class="danger-button" type="button">Эскалировать</button>
-          </div>
-        </div>
 
-        <div class="incident-layout">
-          <section class="panel sop-panel">
-            <div class="panel-header">
-              <h3>SOP</h3>
-              <span>{{ selectedIncident.status }}</span>
-            </div>
-            <ol class="sop-list">
-              <li
-                v-for="(step, index) in sopSteps"
-                :key="step.title"
-                :class="{ done: index < state.sopStepIndex, active: index === state.sopStepIndex }"
+          <div class="search-block">
+            <label class="search-field">
+              <span>Поиск</span>
+              <input v-model="state.incidentSearch" type="search" placeholder="ID, зона, дверь, камера, оператор" />
+            </label>
+            <div class="segmented-control" aria-label="Быстрые представления инцидентов">
+              <button
+                v-for="preset in incidentPresets"
+                :key="preset.id"
+                type="button"
+                :class="{ active: state.incidentPreset === preset.id }"
+                @click="state.incidentPreset = preset.id"
               >
-                <div class="sop-step-body">
-                  <strong>{{ step.title }}</strong>
-                  <span>{{ step.detail }}</span>
-                  <div v-if="step.image" class="sop-step-media">
-                    {{ step.image }}
-                  </div>
-                </div>
-                <button
-                  class="ghost-button compact-button"
-                  type="button"
-                  :disabled="index > state.sopStepIndex || index < state.sopStepIndex"
-                  @click="confirmSopStep(index)"
+                {{ preset.label }}
+              </button>
+            </div>
+            <div class="chip-row" aria-label="Фильтр критичности">
+              <button
+                v-for="option in severityOptions"
+                :key="option.id"
+                type="button"
+                :class="{ active: state.incidentSeverity === option.id }"
+                @click="state.incidentSeverity = option.id"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+
+          <div class="incident-list-scroll">
+            <button
+              v-for="incident in filteredIncidents"
+              :key="incident.id"
+              class="incident-card"
+              :class="[`severity-${incident.severity}`, { selected: selectedIncident.id === incident.id }]"
+              type="button"
+              @click="selectIncident(incident.id)"
+            >
+              <span class="severity-dot"></span>
+              <span>
+                <strong>{{ incident.title }}</strong>
+                <small>{{ incident.location }}</small>
+                <small>{{ incident.id }} · {{ incident.owner }} · {{ incident.status }}</small>
+              </span>
+              <em>{{ incident.time }}</em>
+            </button>
+            <div v-if="filteredIncidents.length === 0" class="empty-state">
+              Нет инцидентов под выбранные фильтры
+            </div>
+          </div>
+        </section>
+
+        <div class="incident-focus">
+          <div class="incident-hero">
+            <div>
+              <p class="eyebrow">{{ selectedIncident.id }} / {{ selectedIncident.source }}</p>
+              <h3>{{ selectedIncident.title }}</h3>
+              <p>{{ selectedIncident.location }}</p>
+            </div>
+            <div class="incident-actions">
+              <span class="timer">{{ selectedIncident.time }}</span>
+              <button class="ghost-button" type="button" @click="showIncidentList">К списку</button>
+              <button class="ghost-button" type="button">Назначить</button>
+              <button class="danger-button" type="button">Эскалировать</button>
+            </div>
+          </div>
+
+          <div class="incident-layout">
+            <section class="panel sop-panel">
+              <div class="panel-header">
+                <h3>SOP</h3>
+                <span>{{ selectedIncident.status }}</span>
+              </div>
+              <ol class="sop-list">
+                <li
+                  v-for="(step, index) in sopSteps"
+                  :key="step.title"
+                  :class="{ done: index < state.sopStepIndex, active: index === state.sopStepIndex }"
                 >
-                  {{ index < state.sopStepIndex ? "Готово" : "Подтвердить" }}
-                </button>
-              </li>
-            </ol>
-            <div class="sop-actions">
-              <button class="danger-button" type="button" @click="finishIncident">
-                Завершить инцидент
-              </button>
-            </div>
-          </section>
-
-          <section class="panel command-panel">
-            <div class="panel-header">
-              <h3>Команды</h3>
-              <span>исполнение оператором</span>
-            </div>
-            <div class="command-grid">
-              <button
-                v-for="command in incidentCommands"
-                :key="command.id"
-                :class="command.tone === 'danger' ? 'danger-button' : 'ghost-button'"
-                type="button"
-              >
-                {{ command.label }}
-              </button>
-            </div>
-          </section>
-
-          <section class="panel map-panel">
-            <div class="panel-header">
-              <h3>Контекст места</h3>
-              <span>2 камеры рядом</span>
-            </div>
-            <div class="map-canvas incident-map">
-              <div class="room room-a">Зона 2B</div>
-              <div class="room room-b">Лестница</div>
-              <button class="map-marker marker-critical">Door D12</button>
-              <button class="camera camera-one" :class="{ 'camera-focused': state.focusedCameraId === 'cam-12' }" type="button" @click="openCameraFromMap('cam-12')">Cam 12</button>
-              <span class="fov fov-one"></span>
-            </div>
-          </section>
-
-          <section class="panel video-stack">
-            <div class="panel-header">
-              <h3>Видео</h3>
-              <span>pre/post alarm</span>
-            </div>
-            <div class="video-tile large-video">Camera 12 / -00:30</div>
-            <div class="timeline">
-              <span></span>
-              <strong></strong>
-            </div>
-          </section>
-
-          <section class="panel linked-events-panel">
-            <div class="panel-header">
-              <h3>Связанные события</h3>
-              <span>{{ selectedIncidentEvents.length }} событий</span>
-            </div>
-            <div class="linked-event-list">
-              <button
-                v-for="event in selectedIncidentEvents"
-                :key="`${event.time}-${event.source}`"
-                class="linked-event"
-                type="button"
-                @click="setActiveScreen('events')"
-              >
-                <span>{{ event.time }}</span>
-                <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
-                <strong>{{ event.type }}</strong>
-                <small>{{ event.category }} · {{ event.source }}</small>
-              </button>
-              <div v-if="selectedIncidentEvents.length === 0" class="empty-state">
-                Связанных событий пока нет
-              </div>
-            </div>
-          </section>
-
-          <section class="panel journal-panel">
-            <div class="panel-header">
-              <h3>Журнал</h3>
-              <span>audit trail</span>
-            </div>
-            <div class="comment-box">
-              <label class="search-field">
-                <span>Комментарий оператора</span>
-                <textarea
-                  v-model="state.incidentComment"
-                  placeholder="Опишите результат проверки, контакт с постом, причину закрытия или эскалации"
-                ></textarea>
-              </label>
-              <div class="comment-actions">
-                <button class="ghost-button" type="button" :disabled="state.incidentComment.trim() === ''">
-                  Добавить комментарий
-                </button>
-                <button class="primary-button" type="button" :disabled="state.incidentComment.trim() === ''">
-                  Добавить в отчет
+                  <div class="sop-step-body">
+                    <strong>{{ step.title }}</strong>
+                    <span>{{ step.detail }}</span>
+                    <div v-if="step.image" class="sop-step-media">
+                      {{ step.image }}
+                    </div>
+                  </div>
+                  <button
+                    class="ghost-button compact-button"
+                    type="button"
+                    :disabled="index > state.sopStepIndex || index < state.sopStepIndex"
+                    @click="confirmSopStep(index)"
+                  >
+                    {{ index < state.sopStepIndex ? "Готово" : "Подтвердить" }}
+                  </button>
+                </li>
+              </ol>
+              <div class="sop-actions">
+                <button class="danger-button" type="button" @click="finishIncident">
+                  Завершить инцидент
                 </button>
               </div>
-            </div>
-            <ul class="activity-list">
-              <li><strong>12:31</strong> Инцидент принят оператором Иванов</li>
-              <li><strong>12:32</strong> Открыта Camera 12</li>
-              <li><strong>12:33</strong> SOP шаг 2 отмечен выполненным</li>
-              <li v-if="state.incidentComment.trim() !== ''">
-                <strong>Сейчас</strong> {{ state.incidentComment }}
-              </li>
-            </ul>
-          </section>
+            </section>
+
+            <section class="panel command-panel">
+              <div class="panel-header">
+                <h3>Команды</h3>
+                <span>исполнение оператором</span>
+              </div>
+              <div class="command-grid">
+                <button
+                  v-for="command in incidentCommands"
+                  :key="command.id"
+                  :class="command.tone === 'danger' ? 'danger-button' : 'ghost-button'"
+                  type="button"
+                >
+                  {{ command.label }}
+                </button>
+              </div>
+            </section>
+
+            <section class="panel map-panel">
+              <div class="panel-header">
+                <h3>Контекст места</h3>
+                <span>2 камеры рядом</span>
+              </div>
+              <div class="map-canvas incident-map">
+                <div class="room room-a">Зона 2B</div>
+                <div class="room room-b">Лестница</div>
+                <button class="map-marker marker-critical">Door D12</button>
+                <button class="camera camera-one" :class="{ 'camera-focused': state.focusedCameraId === 'cam-12' }" type="button" @click="openCameraFromMap('cam-12')">Cam 12</button>
+                <span class="fov fov-one"></span>
+              </div>
+            </section>
+
+            <section class="panel video-stack">
+              <div class="panel-header">
+                <h3>Видео</h3>
+                <span>pre/post alarm</span>
+              </div>
+              <div class="video-tile large-video">Camera 12 / -00:30</div>
+              <div class="timeline">
+                <span></span>
+                <strong></strong>
+              </div>
+            </section>
+
+            <section class="panel linked-events-panel">
+              <div class="panel-header">
+                <h3>Связанные события</h3>
+                <span>{{ selectedIncidentEvents.length }} событий</span>
+              </div>
+              <div class="linked-event-list">
+                <button
+                  v-for="event in selectedIncidentEvents"
+                  :key="`${event.time}-${event.source}`"
+                  class="linked-event"
+                  type="button"
+                  @click="setActiveScreen('events')"
+                >
+                  <span>{{ event.time }}</span>
+                  <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
+                  <strong>{{ event.type }}</strong>
+                  <small>{{ event.category }} · {{ event.source }}</small>
+                </button>
+                <div v-if="selectedIncidentEvents.length === 0" class="empty-state">
+                  Связанных событий пока нет
+                </div>
+              </div>
+            </section>
+
+            <section class="panel journal-panel">
+              <div class="panel-header">
+                <h3>Журнал</h3>
+                <span>audit trail</span>
+              </div>
+              <div class="comment-box">
+                <label class="search-field">
+                  <span>Комментарий оператора</span>
+                  <textarea
+                    v-model="state.incidentComment"
+                    placeholder="Опишите результат проверки, контакт с постом, причину закрытия или эскалации"
+                  ></textarea>
+                </label>
+                <div class="comment-actions">
+                  <button class="ghost-button" type="button" :disabled="state.incidentComment.trim() === ''">
+                    Добавить комментарий
+                  </button>
+                  <button class="primary-button" type="button" :disabled="state.incidentComment.trim() === ''">
+                    Добавить в отчет
+                  </button>
+                </div>
+              </div>
+              <ul class="activity-list">
+                <li><strong>12:31</strong> Инцидент принят оператором Иванов</li>
+                <li><strong>12:32</strong> Открыта Camera 12</li>
+                <li><strong>12:33</strong> SOP шаг 2 отмечен выполненным</li>
+                <li v-if="state.incidentComment.trim() !== ''">
+                  <strong>Сейчас</strong> {{ state.incidentComment }}
+                </li>
+              </ul>
+            </section>
+          </div>
         </div>
       </section>
 
@@ -1061,17 +1141,41 @@ onUnmounted(() => {
                 </label>
               </div>
 
+              <div v-if="selectedEventForPanel(panel)" class="event-panel-detail">
+                <div class="event-panel-detail-main">
+                  <span class="event-time">{{ selectedEventForPanel(panel).time }}</span>
+                  <strong>{{ selectedEventForPanel(panel).type }}</strong>
+                  <small>
+                    {{ selectedEventForPanel(panel).category }} ·
+                    {{ selectedEventForPanel(panel).source }} ·
+                    {{ selectedEventForPanel(panel).location }}
+                  </small>
+                </div>
+                <button class="incident-number-button" type="button" @click="openIncidentFromEvent(selectedEventForPanel(panel))">
+                  {{ selectedEventForPanel(panel).incident }}
+                </button>
+                <div class="event-panel-payload">
+                  <code v-for="item in selectedEventForPanel(panel).payload.slice(0, 3)" :key="`${panel.id}-${item}`">
+                    {{ item }}
+                  </code>
+                </div>
+                <div class="event-panel-controls">
+                  <button class="ghost-button compact-button" type="button">Подтвердить</button>
+                  <button class="ghost-button compact-button" type="button">Команда</button>
+                </div>
+              </div>
+
               <div class="mini-event-table">
                 <div
                   v-for="event in filteredPanelEvents(panel)"
                   :key="`${panel.id}-${event.time}-${event.source}`"
                   class="mini-event-row"
-                  :class="{ selected: selectedEvent.id === event.id }"
+                  :class="{ selected: selectedEventForPanel(panel)?.id === event.id }"
                   role="button"
                   tabindex="0"
-                  @click="selectEvent(event)"
-                  @keydown.enter="selectEvent(event)"
-                  @keydown.space.prevent="selectEvent(event)"
+                  @click="selectEvent(event, panel)"
+                  @keydown.enter="selectEvent(event, panel)"
+                  @keydown.space.prevent="selectEvent(event, panel)"
                 >
                   <span class="event-time">{{ event.time }}</span>
                   <mark :class="`priority-${event.priority.toLowerCase()}`">{{ event.priority }}</mark>
@@ -1088,54 +1192,6 @@ onUnmounted(() => {
                 </div>
               </div>
             </section>
-          </div>
-        </section>
-
-        <section class="panel incident-link-panel event-detail-panel">
-          <div class="panel-header">
-            <h3>Карточка события</h3>
-            <button class="incident-number-button" type="button" @click="openIncidentFromEvent(selectedEvent)">
-              {{ selectedEvent.incident }}
-            </button>
-          </div>
-          <div class="event-detail-body">
-            <div>
-              <span class="event-time">{{ selectedEvent.time }}</span>
-              <h3>{{ selectedEvent.type }}</h3>
-              <p>{{ selectedEvent.category }} · {{ selectedEvent.source }} · {{ selectedEvent.location }}</p>
-            </div>
-            <div class="event-detail-grid">
-              <span>Приоритет <strong>{{ selectedEvent.priority }}</strong></span>
-              <span>Статус <strong>{{ selectedEvent.status }}</strong></span>
-              <span>Источник <strong>{{ selectedEvent.source }}</strong></span>
-            </div>
-            <div v-if="selectedEvent.media" class="event-media video-tile">
-              <strong>{{ selectedEvent.media }}</strong>
-              <small>{{ selectedEvent.location }}</small>
-            </div>
-            <div class="event-payload">
-              <strong>Набор данных</strong>
-              <code v-for="item in selectedEvent.payload" :key="item">{{ item }}</code>
-            </div>
-            <div class="event-controls">
-              <button class="ghost-button" type="button">Подтвердить</button>
-              <button class="ghost-button" type="button">Открыть дверь</button>
-              <button class="ghost-button" type="button">PTZ к источнику</button>
-              <button class="primary-button" type="button">Создать команду</button>
-            </div>
-            <div class="relation-strip compact-relations">
-              <button
-                v-for="event in selectedIncidentEvents"
-                :key="`relation-${event.time}-${event.source}`"
-                type="button"
-                :class="{ selected: selectedEvent.id === event.id }"
-                @click="selectEvent(event)"
-              >
-                <span>{{ event.time }}</span>
-                <strong>{{ event.type }}</strong>
-                <small>{{ event.source }}</small>
-              </button>
-            </div>
           </div>
         </section>
       </section>
