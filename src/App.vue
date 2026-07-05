@@ -77,6 +77,7 @@ const state = reactive({
   incidentContextVisible: false,
   incidentComment: "",
   sopStepIndex: 2,
+  selectedSopDetailIndex: null,
 });
 
 const severityOptions = [
@@ -135,6 +136,52 @@ const sopSteps = [
       "Описать наблюдения оператора, приложить ключевой кадр или фото с места, указать выполненные команды и причину закрытия, эскалации или передачи следующей смене. Комментарий должен быть достаточным для отчета и последующего разбора инцидента.",
     image: "Фото поста / акт проверки",
   },
+];
+
+const sopStepDetails = [
+  {
+    checklist: ["Зафиксировать оператора", "Проверить источник первичного события", "Начать аудит действий"],
+    evidence: "Карточка события, ID оператора, время принятия",
+    command: "Принять инцидент",
+  },
+  {
+    checklist: ["Открыть pre/post alarm", "Сравнить соседние камеры", "Отметить ложное срабатывание или объект"],
+    evidence: "Ключевой кадр Camera 12 и архив -00:30",
+    command: "Сохранить фрагмент",
+  },
+  {
+    checklist: ["Передать точную локацию", "Запросить подтверждение на месте", "Записать имя сотрудника поста"],
+    evidence: "Комментарий оператора и запись переговоров",
+    command: "Вызвать пост охраны",
+  },
+  {
+    checklist: ["Проверить эвакуационные маршруты", "Получить разрешение супервизора", "Зафиксировать выполненную команду"],
+    evidence: "Аудит команды и состояние дверей зоны 2B",
+    command: "Заблокировать зону 2B",
+  },
+  {
+    checklist: ["Описать причину закрытия", "Приложить фото или кадр", "Отметить передачу в отчет"],
+    evidence: "Комментарий, фото, список выполненных команд",
+    command: "Добавить в отчет",
+  },
+];
+
+const caseTimelineItems = [
+  { time: "12:30:30", title: "Потеря сигнала", detail: "Camera 18, КПП-3", tone: "low" },
+  { time: "12:30:44", title: "Видеоаналитика", detail: "Camera 12 обнаружила человека", tone: "high" },
+  { time: "12:30:55", title: "Движение в зоне", detail: "Motion 2B, 18 сек", tone: "medium" },
+  { time: "12:31:08", title: "Взлом двери", detail: "Door D12, создан INC-2481", tone: "critical" },
+  { time: "12:31:42", title: "Инцидент принят", detail: "Оператор Иванов", tone: "operator" },
+  { time: "12:33:10", title: "SOP шаг 2", detail: "Видео проверено", tone: "operator" },
+];
+
+const relationGraphNodes = [
+  { id: "incident", label: "INC-2481", meta: "Critical", className: "relation-incident" },
+  { id: "door", label: "Door D12", meta: "СКУД", className: "relation-device relation-door" },
+  { id: "motion", label: "Motion 2B", meta: "датчик", className: "relation-device relation-motion" },
+  { id: "camera", label: "Camera 12", meta: "VMS", className: "relation-device relation-camera" },
+  { id: "zone", label: "Зона 2B", meta: "локация", className: "relation-zone" },
+  { id: "operator", label: "Иванов", meta: "оператор", className: "relation-person" },
 ];
 
 const incidentCommands = [
@@ -413,6 +460,20 @@ const selectedIncidentEvents = computed(() =>
   eventRows.filter((event) => event.incident === state.selectedIncident),
 );
 
+const selectedSopDetail = computed(() => {
+  if (state.selectedSopDetailIndex === null) {
+    return null;
+  }
+
+  const index = state.selectedSopDetailIndex;
+
+  return {
+    index,
+    step: sopSteps[index],
+    detail: sopStepDetails[index],
+  };
+});
+
 const eventSystemOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.category))]);
 
 const eventSourceOptions = computed(() => ["all", ...new Set(eventRows.map((event) => event.source))]);
@@ -551,6 +612,7 @@ function selectIncident(id) {
   state.incidentListVisible = false;
   state.sopStepIndex = 2;
   state.incidentComment = "";
+  state.selectedSopDetailIndex = 2;
   setActiveScreen("incident");
 }
 
@@ -667,7 +729,16 @@ function selectedEventForPanel(panel) {
 function confirmSopStep(index) {
   if (index <= state.sopStepIndex && state.sopStepIndex < sopSteps.length) {
     state.sopStepIndex = Math.max(state.sopStepIndex, index + 1);
+    state.selectedSopDetailIndex = Math.min(state.sopStepIndex, sopSteps.length - 1);
   }
+}
+
+function openSopStepDetail(index) {
+  state.selectedSopDetailIndex = index;
+}
+
+function closeSopStepDetail() {
+  state.selectedSopDetailIndex = null;
 }
 
 function finishIncident() {
@@ -713,6 +784,23 @@ function openMapFromCamera(cameraId) {
   state.focusedCameraId = cameraId;
   state.mapPreviewCameraId = cameraId;
   setActiveScreen("map");
+}
+
+function openIncidentLocation() {
+  state.focusedCameraId = "cam-12";
+  state.mapPreviewCameraId = "cam-12";
+  setActiveScreen("map");
+}
+
+function openRelationNode(nodeId) {
+  if (nodeId === "camera") {
+    openMapFromCamera("cam-12");
+    return;
+  }
+
+  if (["incident", "door", "motion", "zone"].includes(nodeId)) {
+    openIncidentLocation();
+  }
 }
 
 function toggleFullscreen(screenId) {
@@ -963,6 +1051,7 @@ onUnmounted(() => {
             <div class="incident-actions">
               <span class="timer">{{ selectedIncident.time }}</span>
               <button class="ghost-button" type="button" @click="showIncidentList">К списку</button>
+              <button class="ghost-button" type="button" @click="openIncidentLocation">Локация</button>
               <button class="ghost-button" type="button" @click="state.incidentContextVisible = !state.incidentContextVisible">
                 {{ state.incidentContextVisible ? "Скрыть контекст" : "Показать карту и видео" }}
               </button>
@@ -981,23 +1070,36 @@ onUnmounted(() => {
                 <li
                   v-for="(step, index) in sopSteps"
                   :key="step.title"
-                  :class="{ done: index < state.sopStepIndex, active: index === state.sopStepIndex }"
+                  :class="{
+                    done: index < state.sopStepIndex,
+                    active: index === state.sopStepIndex,
+                    selected: state.selectedSopDetailIndex === index,
+                  }"
                 >
-                  <div class="sop-step-body">
+                  <button class="sop-step-body" type="button" @click="openSopStepDetail(index)">
                     <strong>{{ step.title }}</strong>
                     <span>{{ step.detail }}</span>
                     <div v-if="step.image" class="sop-step-media">
                       {{ step.image }}
                     </div>
-                  </div>
-                  <button
-                    class="ghost-button compact-button"
-                    type="button"
-                    :disabled="index > state.sopStepIndex || index < state.sopStepIndex"
-                    @click="confirmSopStep(index)"
-                  >
-                    {{ index < state.sopStepIndex ? "Готово" : "Подтвердить" }}
                   </button>
+                  <div class="sop-step-actions">
+                    <button
+                      class="ghost-button compact-button"
+                      type="button"
+                      @click="openSopStepDetail(index)"
+                    >
+                      Детали
+                    </button>
+                    <button
+                      class="ghost-button compact-button"
+                      type="button"
+                      :disabled="index > state.sopStepIndex || index < state.sopStepIndex"
+                      @click="confirmSopStep(index)"
+                    >
+                      {{ index < state.sopStepIndex ? "Готово" : "Подтвердить" }}
+                    </button>
+                  </div>
                 </li>
               </ol>
               <div class="sop-actions">
@@ -1032,7 +1134,7 @@ onUnmounted(() => {
               <div class="map-canvas incident-map">
                 <div class="room room-a">Зона 2B</div>
                 <div class="room room-b">Лестница</div>
-                <button class="map-marker marker-critical">Door D12</button>
+                <button class="map-marker marker-critical" type="button" @click="openIncidentLocation">Door D12</button>
                 <button class="camera camera-one" :class="{ 'camera-focused': state.focusedCameraId === 'cam-12' }" type="button" @click="openCameraFromMap('cam-12')">Cam 12</button>
                 <span class="fov fov-one"></span>
               </div>
@@ -1050,10 +1152,27 @@ onUnmounted(() => {
               </div>
             </section>
 
-            <section class="panel linked-events-panel">
+            <section class="panel linked-events-panel relation-graph-panel">
               <div class="panel-header">
-                <h3>Связанные события</h3>
-                <span>{{ selectedIncidentEvents.length }} событий</span>
+                <h3>Граф связей</h3>
+                <span>{{ selectedIncidentEvents.length }} события</span>
+              </div>
+              <div class="relation-graph">
+                <span class="relation-line relation-line-door"></span>
+                <span class="relation-line relation-line-motion"></span>
+                <span class="relation-line relation-line-camera"></span>
+                <span class="relation-line relation-line-zone"></span>
+                <button
+                  v-for="node in relationGraphNodes"
+                  :key="node.id"
+                  :class="['relation-node', node.className]"
+                  type="button"
+                  :title="node.id === 'operator' ? 'Оператор инцидента' : 'Открыть локацию на карте'"
+                  @click="openRelationNode(node.id)"
+                >
+                  <strong>{{ node.label }}</strong>
+                  <small>{{ node.meta }}</small>
+                </button>
               </div>
               <div class="linked-event-list">
                 <button
@@ -1074,10 +1193,24 @@ onUnmounted(() => {
               </div>
             </section>
 
-            <section class="panel journal-panel">
+            <section class="panel journal-panel case-timeline-panel">
               <div class="panel-header">
-                <h3>Журнал</h3>
-                <span>audit trail</span>
+                <h3>Case timeline</h3>
+                <span>события + действия</span>
+              </div>
+              <div class="case-timeline">
+                <button
+                  v-for="item in caseTimelineItems"
+                  :key="`${item.time}-${item.title}`"
+                  :class="`case-timeline-item timeline-${item.tone}`"
+                  type="button"
+                >
+                  <time>{{ item.time }}</time>
+                  <span>
+                    <strong>{{ item.title }}</strong>
+                    <small>{{ item.detail }}</small>
+                  </span>
+                </button>
               </div>
               <div class="comment-box">
                 <label class="search-field">
@@ -1106,6 +1239,47 @@ onUnmounted(() => {
               </ul>
             </section>
           </div>
+
+          <aside v-if="selectedSopDetail" class="sop-detail-drawer" aria-label="Детали шага SOP">
+            <div class="sop-detail-header">
+              <div>
+                <p class="eyebrow">SOP step {{ selectedSopDetail.index + 1 }}</p>
+                <h3>{{ selectedSopDetail.step.title }}</h3>
+              </div>
+              <button class="icon-button detail-close-button" type="button" @click="closeSopStepDetail">
+                ×
+              </button>
+            </div>
+            <p class="sop-detail-copy">{{ selectedSopDetail.step.detail }}</p>
+            <div v-if="selectedSopDetail.step.image" class="sop-step-media sop-detail-media">
+              {{ selectedSopDetail.step.image }}
+            </div>
+            <section class="sop-detail-section">
+              <h4>Проверить перед подтверждением</h4>
+              <ul>
+                <li v-for="item in selectedSopDetail.detail.checklist" :key="item">{{ item }}</li>
+              </ul>
+            </section>
+            <section class="sop-detail-section">
+              <h4>Доказательства</h4>
+              <p>{{ selectedSopDetail.detail.evidence }}</p>
+            </section>
+            <section class="sop-detail-section">
+              <h4>Команда</h4>
+              <button class="ghost-button" type="button">{{ selectedSopDetail.detail.command }}</button>
+            </section>
+            <div class="sop-detail-actions">
+              <button
+                class="primary-button"
+                type="button"
+                :disabled="selectedSopDetail.index !== state.sopStepIndex"
+                @click="confirmSopStep(selectedSopDetail.index)"
+              >
+                Подтвердить шаг
+              </button>
+              <button class="ghost-button" type="button">Добавить комментарий</button>
+            </div>
+          </aside>
         </div>
       </section>
 
@@ -1650,7 +1824,7 @@ onUnmounted(() => {
         </section>
       </section>
 
-      <section v-else class="screen supervisor-screen">
+      <section v-else-if="state.activeScreen === 'supervisor'" class="screen supervisor-screen">
         <div class="kpi-grid">
           <section class="panel kpi-card">
             <span>MTTA</span>
@@ -1739,6 +1913,7 @@ onUnmounted(() => {
           </section>
         </div>
       </section>
+
     </section>
   </main>
 </template>
