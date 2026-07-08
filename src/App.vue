@@ -15,6 +15,12 @@ const screens = [
     icon: ["M4 6h16", "M7 12h10", "M10 18h4"],
   },
   {
+    id: "rules",
+    label: "Правила",
+    subtitle: "DSL, корреляция и SOP",
+    icon: ["M4 7h5", "M15 7h5", "M9 7h6", "M12 7v10", "M6 17h12"],
+  },
+  {
     id: "archive",
     label: "Архив",
     subtitle: "Завершенные инциденты и отчеты",
@@ -78,6 +84,23 @@ const state = reactive({
   incidentComment: "",
   sopStepIndex: 2,
   selectedSopDetailIndex: null,
+  ruleTemplate: "sensor-then-camera",
+  ruleName: "Сначала датчик, потом камера",
+  ruleTriggerType: "sequence",
+  ruleWindow: "60s",
+  ruleCorrelationType: "by_relation",
+  rulePrimaryEvent: "vibration_detected",
+  ruleSecondaryEvent: "motion_detected",
+  ruleEvents: [
+    { id: "evt-node-1", alias: "sensor", messageType: "vibration_detected" },
+    { id: "evt-node-2", alias: "camera", messageType: "motion_detected" },
+  ],
+  selectedRuleNodeId: "node-trigger",
+  nextRuleEventIndex: 3,
+  ruleCount: 3,
+  ruleSeverity: "HIGH",
+  ruleIncidentType: "perimeter_intrusion",
+  ruleSopId: "sop-perimeter-check",
 });
 
 const severityOptions = [
@@ -404,6 +427,132 @@ const cameras = [
   }),
 ];
 
+const rulePalette = [
+  { type: "event", title: "Добавить событие", detail: "новая Event-карточка из Event Catalog" },
+];
+
+const ruleTemplates = [
+  {
+    id: "sensor-then-camera",
+    title: "Сначала датчик, потом камера",
+    meta: "sequence · relation · HIGH",
+    values: {
+      ruleName: "Сначала датчик, потом камера",
+      ruleTriggerType: "sequence",
+      ruleWindow: "60s",
+      ruleCorrelationType: "by_relation",
+      rulePrimaryEvent: "vibration_detected",
+      ruleSecondaryEvent: "motion_detected",
+      ruleEvents: [
+        { id: "evt-node-1", alias: "sensor", messageType: "vibration_detected" },
+        { id: "evt-node-2", alias: "camera", messageType: "motion_detected" },
+      ],
+      ruleCount: 3,
+      ruleSeverity: "HIGH",
+      ruleIncidentType: "perimeter_intrusion",
+      ruleSopId: "sop-perimeter-check",
+    },
+  },
+  {
+    id: "many-sensors-zone",
+    title: "Много датчиков в зоне",
+    meta: "aggregation · zone · HIGH",
+    values: {
+      ruleName: "Много датчиков в одной зоне",
+      ruleTriggerType: "aggregation",
+      ruleWindow: "2m",
+      ruleCorrelationType: "by_keys",
+      rulePrimaryEvent: "vibration_detected",
+      ruleSecondaryEvent: "motion_detected",
+      ruleEvents: [
+        { id: "evt-node-1", alias: "sensor", messageType: "vibration_detected" },
+      ],
+      ruleCount: 3,
+      ruleSeverity: "HIGH",
+      ruleIncidentType: "zone_intrusion",
+      ruleSopId: "sop-zone-check",
+    },
+  },
+  {
+    id: "door-and-motion",
+    title: "Дверь и движение",
+    meta: "correlation · zone · MEDIUM",
+    values: {
+      ruleName: "Дверь и движение в зоне",
+      ruleTriggerType: "correlation",
+      ruleWindow: "60s",
+      ruleCorrelationType: "by_keys",
+      rulePrimaryEvent: "door_forced_open",
+      ruleSecondaryEvent: "motion_detected",
+      ruleEvents: [
+        { id: "evt-node-1", alias: "door", messageType: "door_forced_open" },
+        { id: "evt-node-2", alias: "camera", messageType: "motion_detected" },
+      ],
+      ruleCount: 2,
+      ruleSeverity: "MEDIUM",
+      ruleIncidentType: "intrusion",
+      ruleSopId: "sop-intrusion",
+    },
+  },
+];
+
+const ruleTriggerOptions = [
+  { id: "single_event", label: "single_event" },
+  { id: "correlation", label: "correlation" },
+  { id: "sequence", label: "sequence" },
+  { id: "aggregation", label: "aggregation" },
+];
+
+const ruleCorrelationOptions = [
+  { id: "by_keys", label: "by_keys / device.zoneId" },
+  { id: "by_relation", label: "by_relation / camera monitors sensor" },
+  { id: "by_relation_group", label: "by_relation_group / camera sensors" },
+];
+
+const ruleEventCatalog = [
+  {
+    messageType: "vibration_detected",
+    label: "Вибрация",
+    alias: "sensor",
+    tone: "sensor",
+    where: [{ field: "event.payload.level", op: ">=", value: 0.7 }],
+    meta: "event.payload.level >= 0.7",
+  },
+  {
+    messageType: "motion_detected",
+    label: "Движение по камере",
+    alias: "camera",
+    tone: "camera",
+    where: [{ field: "event.payload.confidence", op: ">=", value: 0.8 }],
+    meta: "event.payload.confidence >= 0.8",
+  },
+  {
+    messageType: "door_forced_open",
+    label: "Дверь вскрыта",
+    alias: "door",
+    tone: "sensor",
+    where: [{ field: "event.payload.state", op: "=", value: "forced" }],
+    meta: "event.payload.state = forced",
+  },
+  {
+    messageType: "access_denied",
+    label: "Отказ доступа",
+    alias: "access",
+    tone: "sensor",
+    where: [{ field: "event.payload.reason", op: "exists", value: true }],
+    meta: "event.payload.reason exists",
+  },
+];
+
+const ruleIncidentTypes = ["intrusion", "perimeter_intrusion", "zone_intrusion", "suspicious_access"];
+const ruleSeverityOptions = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const ruleSopOptions = [
+  { id: "sop-perimeter-check", label: "Проверка периметра" },
+  { id: "sop-zone-check", label: "Проверка зоны" },
+  { id: "sop-intrusion", label: "Проникновение" },
+  { id: "sop-access-check", label: "Проверка доступа" },
+];
+
 const screenIds = new Set(screens.map((screen) => screen.id));
 
 const selectedIncident = computed(
@@ -572,6 +721,259 @@ const mapDeviceEvents = computed(() =>
       event.source === "Door D12",
   ),
 );
+
+const selectedRuleTemplate = computed(
+  () => ruleTemplates.find((template) => template.id === state.ruleTemplate) ?? ruleTemplates[0],
+);
+
+function ruleEventDefinition(messageType) {
+  return ruleEventCatalog.find((event) => event.messageType === messageType) ?? ruleEventCatalog[0];
+}
+
+const selectedRuleNode = computed(() => {
+  if (state.selectedRuleNodeId === "node-trigger") {
+    return { kind: "trigger", title: "Trigger" };
+  }
+
+  if (state.selectedRuleNodeId === "node-action") {
+    return { kind: "action", title: "Action" };
+  }
+
+  const event = state.ruleEvents.find((item) => item.id === state.selectedRuleNodeId);
+  return event ? { kind: "event", title: "Event", event } : { kind: "trigger", title: "Trigger" };
+});
+
+const activeRuleEvents = computed(() => {
+  if (state.ruleEvents.length === 0) {
+    return [{ id: "evt-node-fallback", alias: "event", messageType: ruleEventCatalog[0].messageType }];
+  }
+
+  if (state.ruleTriggerType === "single_event" || state.ruleTriggerType === "aggregation") {
+    return [state.ruleEvents[0]];
+  }
+
+  return state.ruleEvents;
+});
+
+const activeRuleEventMatchers = computed(() =>
+  activeRuleEvents.value.map((item) => {
+    const definition = ruleEventDefinition(item.messageType);
+    return {
+      alias: item.alias || definition.alias,
+      messageType: item.messageType,
+      where: definition.where,
+    };
+  }),
+);
+
+const ruleCorrelation = computed(() => {
+  if (state.ruleTriggerType === "single_event") {
+    return null;
+  }
+
+  if (state.ruleCorrelationType === "by_relation") {
+    const cameraEvent =
+      activeRuleEvents.value.find((event) => ruleEventDefinition(event.messageType).alias === "camera") ??
+      activeRuleEvents.value[1] ??
+      activeRuleEvents.value[0];
+    const targetEvent =
+      activeRuleEvents.value.find((event) => ruleEventDefinition(event.messageType).alias !== "camera") ??
+      activeRuleEvents.value[0];
+
+    return {
+      type: "by_relation",
+      relationType: "monitors",
+      from: `${cameraEvent.alias}.event.deviceId`,
+      to: `${targetEvent.alias}.event.deviceId`,
+    };
+  }
+
+  if (state.ruleCorrelationType === "by_relation_group") {
+    const event = activeRuleEvents.value[0];
+
+    return {
+      type: "by_relation_group",
+      relationType: "monitors",
+      groupBy: "relation.fromDeviceId",
+      eventDeviceRef: `${event.alias}.event.deviceId`,
+    };
+  }
+
+  return {
+    type: "by_keys",
+    keys: ["device.zoneId"],
+  };
+});
+
+const ruleTrigger = computed(() => {
+  const event = activeRuleEventMatchers.value[0];
+
+  if (state.ruleTriggerType === "single_event") {
+    return {
+      type: "single_event",
+      event,
+    };
+  }
+
+  if (state.ruleTriggerType === "aggregation") {
+    return {
+      type: "aggregation",
+      window: state.ruleWindow,
+      correlation: ruleCorrelation.value,
+      event,
+      count: {
+        op: ">=",
+        value: Number(state.ruleCount),
+        distinctBy: "event.deviceId",
+      },
+    };
+  }
+
+  return {
+    type: state.ruleTriggerType,
+    window: state.ruleWindow,
+    correlation: ruleCorrelation.value,
+    events: activeRuleEventMatchers.value,
+  };
+});
+
+const ruleDslPreview = computed(() => ({
+  schemaVersion: "psim-rule-dsl/v0.1",
+  ruleId: state.ruleTemplate,
+  name: state.ruleName,
+  enabled: true,
+  priority: 100,
+  trigger: ruleTrigger.value,
+  action: {
+    messageType: "incident_candidate_created",
+    incidentType: state.ruleIncidentType,
+    severity: state.ruleSeverity,
+    recommendedSopId: state.ruleSopId,
+  },
+}));
+
+const ruleNodes = computed(() => {
+  const eventNodes = activeRuleEvents.value.map((event, index, list) => {
+    const definition = ruleEventDefinition(event.messageType);
+    const y =
+      list.length === 1
+        ? 43
+        : 18 + (index * 52) / Math.max(list.length - 1, 1);
+
+    return {
+      id: event.id,
+      title: "Event",
+      badge: event.alias || definition.alias,
+      text: event.messageType,
+      meta: definition.meta,
+      x: 8,
+      y,
+      tone: definition.tone,
+      kind: "event",
+    };
+  });
+
+  const triggerNode = {
+    id: "node-trigger",
+    title: "Trigger",
+    badge: state.ruleTriggerType,
+    text:
+      state.ruleTriggerType === "aggregation"
+        ? `${state.ruleCount}+ событий за ${state.ruleWindow}`
+        : state.ruleTriggerType === "single_event"
+          ? "Одно событие"
+          : state.ruleTriggerType === "sequence"
+            ? "Порядок событий важен"
+            : "Порядок не важен",
+    meta:
+      state.ruleTriggerType === "single_event"
+        ? "no window"
+        : `${state.ruleWindow} · ${state.ruleCorrelationType}`,
+    x: 40,
+    y: 43,
+    tone: "trigger",
+    kind: "trigger",
+  };
+
+  const actionNode = {
+    id: "node-action",
+    title: "Action",
+    badge: "candidate",
+    text: "incident_candidate_created",
+    meta: `${state.ruleIncidentType} / ${state.ruleSeverity}`,
+    x: 72,
+    y: 43,
+    tone: "action",
+    kind: "action",
+  };
+
+  return [...eventNodes, triggerNode, actionNode];
+});
+
+const ruleLinkPaths = computed(() => [
+  ...ruleNodes.value
+    .filter((node) => node.kind === "event")
+    .map((node) => {
+      const y = Math.round((node.y + 10) * 5.2);
+      return `M230 ${y} C340 ${y} 345 260 455 260`;
+    }),
+  "M625 260 C710 260 725 260 815 260",
+]);
+
+const selectedRuleEvent = computed(() => {
+  if (selectedRuleNode.value.kind !== "event") {
+    return null;
+  }
+
+  return selectedRuleNode.value.event;
+});
+
+const ruleSteps = computed(() => [
+  "Выбрать типы событий из Event Catalog",
+  state.ruleTriggerType === "aggregation" ? "Задать количество и окно" : "Задать порядок и окно времени",
+  state.ruleCorrelationType === "by_keys" ? "Сгруппировать по device.zoneId" : "Проверить связь camera --monitors--> sensor",
+  "Опубликовать incident_candidate_created",
+]);
+
+const ruleDslJson = computed(() => JSON.stringify(ruleDslPreview.value, null, 2));
+
+function applyRuleTemplate(templateId) {
+  const template = ruleTemplates.find((item) => item.id === templateId);
+  if (!template) return;
+
+  state.ruleTemplate = template.id;
+  Object.assign(state, template.values);
+  state.selectedRuleNodeId = "node-trigger";
+  state.nextRuleEventIndex = state.ruleEvents.length + 1;
+}
+
+function selectRuleNode(nodeId) {
+  state.selectedRuleNodeId = nodeId;
+}
+
+function addRuleEvent() {
+  const nextDefinition = ruleEventCatalog[state.ruleEvents.length % ruleEventCatalog.length];
+  const nextId = `evt-node-${state.nextRuleEventIndex}`;
+
+  state.ruleEvents.push({
+    id: nextId,
+    alias: `${nextDefinition.alias}${state.nextRuleEventIndex}`,
+    messageType: nextDefinition.messageType,
+  });
+  state.nextRuleEventIndex += 1;
+  state.selectedRuleNodeId = nextId;
+
+  if (state.ruleTriggerType === "single_event" || state.ruleTriggerType === "aggregation") {
+    state.ruleTriggerType = "correlation";
+  }
+}
+
+function removeSelectedRuleEvent() {
+  if (selectedRuleNode.value.kind !== "event" || state.ruleEvents.length <= 1) return;
+
+  state.ruleEvents = state.ruleEvents.filter((event) => event.id !== selectedRuleNode.value.event.id);
+  state.selectedRuleNodeId = "node-trigger";
+}
 
 function screenFromRoute() {
   if (typeof window === "undefined") return null;
@@ -1523,6 +1925,223 @@ onUnmounted(() => {
             </section>
           </div>
         </section>
+      </section>
+
+      <section v-else-if="state.activeScreen === 'rules'" class="screen rules-screen">
+        <section class="panel rule-library-panel">
+          <div class="panel-header">
+            <h3>Блоки</h3>
+            <span>Rete-style</span>
+          </div>
+
+          <div class="rule-palette">
+            <button
+              v-for="item in rulePalette"
+              :key="item.type"
+              class="rule-palette-item"
+              type="button"
+              @click="addRuleEvent"
+            >
+              <strong>{{ item.title }}</strong>
+              <small>{{ item.detail }}</small>
+            </button>
+          </div>
+
+          <div class="rule-list">
+            <div class="panel-header compact-panel-header">
+              <h3>Правила</h3>
+              <span>active</span>
+            </div>
+            <button
+              v-for="template in ruleTemplates"
+              :key="template.id"
+              class="rule-list-item"
+              :class="{ selected: state.ruleTemplate === template.id }"
+              type="button"
+              @click="applyRuleTemplate(template.id)"
+            >
+              <strong>{{ template.title }}</strong>
+              <small>{{ template.meta }}</small>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel rule-canvas-panel">
+          <div class="panel-header">
+            <div>
+              <h3>Конструктор правила</h3>
+              <span>Rule DSL v0.1 · {{ state.ruleTriggerType }}</span>
+            </div>
+            <div class="event-workbench-actions">
+              <button class="ghost-button compact-button" type="button">Validate</button>
+              <button class="ghost-button compact-button" type="button">Simulate</button>
+              <button class="primary-button compact-button" type="button">Publish</button>
+            </div>
+          </div>
+
+          <div class="rule-canvas">
+            <svg class="rule-links" viewBox="0 0 1000 520" preserveAspectRatio="none" aria-hidden="true">
+              <path v-for="path in ruleLinkPaths" :key="path" :d="path"></path>
+            </svg>
+
+            <article
+              v-for="node in ruleNodes"
+              :key="node.id"
+              class="rule-node"
+              :class="[`rule-node-${node.tone}`, { selected: state.selectedRuleNodeId === node.id }]"
+              :style="{ left: `${node.x}%`, top: `${node.y}%` }"
+              role="button"
+              tabindex="0"
+              @click="selectRuleNode(node.id)"
+              @keydown.enter="selectRuleNode(node.id)"
+              @keydown.space.prevent="selectRuleNode(node.id)"
+            >
+              <div class="rule-node-header">
+                <span>{{ node.title }}</span>
+                <em>{{ node.badge }}</em>
+              </div>
+              <strong>{{ node.text }}</strong>
+              <small>{{ node.meta }}</small>
+            </article>
+          </div>
+
+          <div class="rule-flow-strip">
+            <span v-for="step in ruleSteps" :key="step">{{ step }}</span>
+          </div>
+        </section>
+
+        <aside class="panel rule-inspector-panel">
+          <div class="panel-header">
+            <h3>Свойства</h3>
+            <span>{{ selectedRuleNode.title }}</span>
+          </div>
+
+          <div v-if="selectedRuleNode.kind === 'event' && selectedRuleEvent" class="rule-config-form">
+            <label class="select-field">
+              <span>Тип события</span>
+              <select v-model="selectedRuleEvent.messageType">
+                <option v-for="event in ruleEventCatalog" :key="event.messageType" :value="event.messageType">
+                  {{ event.label }}
+                </option>
+              </select>
+            </label>
+
+            <label class="search-field">
+              <span>Alias</span>
+              <input v-model="selectedRuleEvent.alias" type="text" />
+            </label>
+
+            <label class="search-field">
+              <span>Where</span>
+              <input :value="ruleEventDefinition(selectedRuleEvent.messageType).meta" type="text" readonly />
+            </label>
+
+            <button
+              class="ghost-button compact-button"
+              type="button"
+              :disabled="state.ruleEvents.length <= 1"
+              @click="removeSelectedRuleEvent"
+            >
+              Удалить событие
+            </button>
+          </div>
+
+          <div v-else-if="selectedRuleNode.kind === 'trigger'" class="rule-config-form">
+            <label class="select-field">
+              <span>Тип правила</span>
+              <select v-model="state.ruleTriggerType">
+                <option v-for="option in ruleTriggerOptions" :key="option.id" :value="option.id">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+
+            <label v-if="state.ruleTriggerType !== 'single_event'" class="select-field">
+              <span>Корреляция</span>
+              <select v-model="state.ruleCorrelationType">
+                <option v-for="option in ruleCorrelationOptions" :key="option.id" :value="option.id">
+                  {{ option.label }}
+                </option>
+              </select>
+            </label>
+
+            <label v-if="state.ruleTriggerType !== 'single_event'" class="select-field">
+              <span>Окно</span>
+              <select v-model="state.ruleWindow">
+                <option value="30s">30s</option>
+                <option value="60s">60s</option>
+                <option value="2m">2m</option>
+                <option value="5m">5m</option>
+              </select>
+            </label>
+
+            <label v-if="state.ruleTriggerType === 'aggregation'" class="select-field">
+              <span>Количество</span>
+              <select v-model="state.ruleCount">
+                <option :value="2">2+</option>
+                <option :value="3">3+</option>
+                <option :value="5">5+</option>
+                <option :value="10">10+</option>
+              </select>
+            </label>
+          </div>
+
+          <div v-else class="rule-config-form">
+            <label class="select-field">
+              <span>Тип инцидента</span>
+              <select v-model="state.ruleIncidentType">
+                <option v-for="type in ruleIncidentTypes" :key="type" :value="type">
+                  {{ type }}
+                </option>
+              </select>
+            </label>
+
+            <label class="select-field">
+              <span>Severity</span>
+              <select v-model="state.ruleSeverity">
+                <option v-for="severity in ruleSeverityOptions" :key="severity" :value="severity">
+                  {{ severity }}
+                </option>
+              </select>
+            </label>
+
+            <label class="select-field">
+              <span>SOP</span>
+              <select v-model="state.ruleSopId">
+                <option v-for="sop in ruleSopOptions" :key="sop.id" :value="sop.id">
+                  {{ sop.label }}
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div class="rule-property-grid">
+            <span>
+              Trigger
+              <strong>{{ state.ruleTriggerType }}</strong>
+            </span>
+            <span>
+              Window
+              <strong>{{ state.ruleTriggerType === 'single_event' ? 'none' : state.ruleWindow }}</strong>
+            </span>
+            <span>
+              Relation
+              <strong>{{ state.ruleTriggerType === 'single_event' ? 'none' : state.ruleCorrelationType }}</strong>
+            </span>
+            <span>
+              Action
+              <strong>{{ state.ruleSeverity }} candidate</strong>
+            </span>
+          </div>
+
+          <div class="rule-dsl-preview">
+            <div class="panel-header compact-panel-header">
+              <h3>JSON DSL</h3>
+              <span>generated</span>
+            </div>
+            <pre>{{ ruleDslJson }}</pre>
+          </div>
+        </aside>
       </section>
 
       <section v-else-if="state.activeScreen === 'archive'" class="screen archive-screen">
